@@ -197,27 +197,184 @@ export class SailingScene extends GameScene {
     ];
 
     for (const poi of poiData) {
-      // Create a simple floating marker — a golden sphere bobbing on the water
-      const markerGeo = new THREE.SphereGeometry(1.5, 12, 8);
-      const markerMat = new THREE.MeshStandardMaterial({
-        color: 0xffd700,
-        emissive: 0xffa500,
-        emissiveIntensity: 0.3,
-        roughness: 0.4,
-        metalness: 0.3,
-        transparent: true,
-        opacity: 0.7,
-      });
-      const marker = new THREE.Mesh(markerGeo, markerMat);
-      marker.position.set(poi.x, 2, poi.z);
-      this.scene.add(marker);
+      const markerGroup = new THREE.Group();
+      markerGroup.position.set(poi.x, 0, poi.z);
 
-      // Add a point light so it glows
-      const light = new THREE.PointLight(0xffd700, 2, 30);
+      if (poi.label === 'Floating Wreckage') {
+        // Broken wood planks floating
+        const woodMat = new THREE.MeshStandardMaterial({ color: 0x6B4C30, roughness: 0.9 });
+        for (let i = 0; i < 5; i++) {
+          const plank = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.1, 2 + Math.random()), woodMat);
+          plank.position.set((Math.random() - 0.5) * 4, 0.3, (Math.random() - 0.5) * 4);
+          plank.rotation.y = Math.random() * Math.PI;
+          plank.rotation.z = (Math.random() - 0.5) * 0.3;
+          markerGroup.add(plank);
+        }
+        // Torn sail cloth
+        const clothMat = new THREE.MeshStandardMaterial({ color: 0xD8CDB8, roughness: 0.8, side: THREE.DoubleSide });
+        const cloth = new THREE.Mesh(new THREE.PlaneGeometry(2, 1.5, 4, 3), clothMat);
+        cloth.position.set(0.5, 0.5, 0);
+        cloth.rotation.x = -0.3;
+        markerGroup.add(cloth);
+
+      } else if (poi.label === 'Dolphins') {
+        // 3 dolphin shapes — curved cylinders arcing out of water
+        const dolphinMat = new THREE.MeshStandardMaterial({ color: 0x5A7A8A, roughness: 0.4, metalness: 0.1 });
+        for (let i = 0; i < 3; i++) {
+          const dolphinGroup = new THREE.Group();
+          // Body
+          const body = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.35, 2.5, 8), dolphinMat);
+          body.rotation.z = Math.PI / 2;
+          dolphinGroup.add(body);
+          // Nose
+          const nose = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.6, 6), dolphinMat);
+          nose.rotation.z = -Math.PI / 2;
+          nose.position.x = 1.5;
+          dolphinGroup.add(nose);
+          // Tail fin
+          const tailGeo = new THREE.BoxGeometry(0.05, 0.5, 0.8);
+          const tail = new THREE.Mesh(tailGeo, dolphinMat);
+          tail.position.x = -1.3;
+          dolphinGroup.add(tail);
+          // Dorsal fin
+          const dorsalGeo = new THREE.BoxGeometry(0.5, 0.4, 0.05);
+          const dorsal = new THREE.Mesh(dorsalGeo, dolphinMat);
+          dorsal.position.y = 0.35;
+          dolphinGroup.add(dorsal);
+          // Position in arc
+          dolphinGroup.position.set(i * 2.5 - 2.5, 0.8 + Math.sin(i * 1.2) * 1.5, i * 0.5);
+          dolphinGroup.rotation.z = 0.3 - i * 0.15;
+          dolphinGroup.scale.setScalar(0.8);
+          markerGroup.add(dolphinGroup);
+        }
+
+      } else if (poi.label === 'Merchant Vessel') {
+        // Small distant boat silhouette
+        const boatMat = new THREE.MeshStandardMaterial({ color: 0x5A4030, roughness: 0.85 });
+        const hull = new THREE.Mesh(new THREE.BoxGeometry(4, 1, 1.5), boatMat);
+        hull.position.y = 0.8;
+        markerGroup.add(hull);
+        const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.07, 4, 4), boatMat);
+        mast.position.set(0, 3, 0);
+        markerGroup.add(mast);
+        const sailMat = new THREE.MeshStandardMaterial({ color: 0xE8DCC4, roughness: 0.7, side: THREE.DoubleSide });
+        const sail = new THREE.Mesh(new THREE.PlaneGeometry(2, 2.5), sailMat);
+        sail.position.set(0, 3, 0.3);
+        markerGroup.add(sail);
+        markerGroup.scale.setScalar(1.2);
+
+      } else if (poi.label === 'Floating Amphora') {
+        // Clay amphora jar shape
+        const clayMat = new THREE.MeshStandardMaterial({ color: 0xB8784A, roughness: 0.85 });
+        // Body — tapered cylinder
+        const body = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.25, 1.5, 8), clayMat);
+        body.position.y = 1;
+        markerGroup.add(body);
+        // Neck
+        const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.35, 0.5, 8), clayMat);
+        neck.position.y = 1.9;
+        markerGroup.add(neck);
+        // Rim
+        const rim = new THREE.Mesh(new THREE.TorusGeometry(0.18, 0.04, 6, 12), clayMat);
+        rim.position.y = 2.15;
+        rim.rotation.x = Math.PI / 2;
+        markerGroup.add(rim);
+        // Handles
+        for (let side = -1; side <= 1; side += 2) {
+          const handleGeo = new THREE.TorusGeometry(0.2, 0.04, 6, 8, Math.PI);
+          const handle = new THREE.Mesh(handleGeo, clayMat);
+          handle.position.set(side * 0.45, 1.5, 0);
+          handle.rotation.z = side > 0 ? -Math.PI / 2 : Math.PI / 2;
+          markerGroup.add(handle);
+        }
+        // Tilt it as if floating
+        markerGroup.rotation.z = 0.4;
+        markerGroup.rotation.x = 0.15;
+
+      } else if (poi.label === 'Sea Birds Circling') {
+        // Simple bird shapes — V-shaped wings
+        const birdMat = new THREE.MeshStandardMaterial({ color: 0xEEEEEE, roughness: 0.6 });
+        for (let i = 0; i < 5; i++) {
+          const birdGroup = new THREE.Group();
+          const wingL = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.05, 0.3), birdMat);
+          wingL.position.x = -0.3;
+          wingL.rotation.z = 0.3;
+          birdGroup.add(wingL);
+          const wingR = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.05, 0.3), birdMat);
+          wingR.position.x = 0.3;
+          wingR.rotation.z = -0.3;
+          birdGroup.add(wingR);
+          const bodyB = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.08, 0.5, 4), birdMat);
+          bodyB.rotation.x = Math.PI / 2;
+          birdGroup.add(bodyB);
+          const angle = (i / 5) * Math.PI * 2;
+          birdGroup.position.set(Math.cos(angle) * 3, 6 + i * 0.5, Math.sin(angle) * 3);
+          birdGroup.rotation.y = angle + Math.PI / 2;
+          markerGroup.add(birdGroup);
+        }
+
+      } else if (poi.label === 'Strange Current') {
+        // Swirling water — torus rings at water level
+        const waterMat = new THREE.MeshBasicMaterial({ color: 0x20A0B0, transparent: true, opacity: 0.35, side: THREE.DoubleSide, depthWrite: false });
+        for (let i = 0; i < 3; i++) {
+          const ring = new THREE.Mesh(new THREE.TorusGeometry(2 + i * 1.5, 0.15, 6, 24), waterMat);
+          ring.position.y = 0.3;
+          ring.rotation.x = Math.PI / 2;
+          markerGroup.add(ring);
+        }
+
+      } else if (poi.label === 'Distant Smoke') {
+        // Smoke column — translucent vertical cylinder
+        const smokeMat = new THREE.MeshBasicMaterial({ color: 0x444444, transparent: true, opacity: 0.2, depthWrite: false, side: THREE.DoubleSide });
+        const smokeCol = new THREE.Mesh(new THREE.CylinderGeometry(1, 2.5, 15, 8, 1, true), smokeMat);
+        smokeCol.position.y = 8;
+        markerGroup.add(smokeCol);
+        // Ember glow at base
+        const emberMat = new THREE.MeshBasicMaterial({ color: 0xff4400, transparent: true, opacity: 0.15, depthWrite: false });
+        const ember = new THREE.Mesh(new THREE.CircleGeometry(2, 12), emberMat);
+        ember.rotation.x = -Math.PI / 2;
+        ember.position.y = 0.5;
+        markerGroup.add(ember);
+
+      } else if (poi.label === 'Offering to Poseidon') {
+        // Glowing trident shape + blue glow
+        const goldMat = new THREE.MeshStandardMaterial({ color: 0xC8A030, roughness: 0.3, metalness: 0.7, emissive: 0x4488FF, emissiveIntensity: 0.3 });
+        // Shaft
+        const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 4, 6), goldMat);
+        shaft.position.y = 2.5;
+        markerGroup.add(shaft);
+        // Three prongs
+        for (let p = -1; p <= 1; p++) {
+          const prong = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.06, 1.2, 5), goldMat);
+          prong.position.set(p * 0.3, 4.8, 0);
+          markerGroup.add(prong);
+          // Prong tip
+          const tip = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.3, 5), goldMat);
+          tip.position.set(p * 0.3, 5.5, 0);
+          markerGroup.add(tip);
+        }
+        // Blue glow
+        const blueMat = new THREE.MeshBasicMaterial({ color: 0x2266FF, transparent: true, opacity: 0.15, depthWrite: false });
+        const glow = new THREE.Mesh(new THREE.CircleGeometry(3, 16), blueMat);
+        glow.rotation.x = -Math.PI / 2;
+        glow.position.y = 0.3;
+        markerGroup.add(glow);
+
+      } else {
+        // Fallback — small golden sphere
+        const fallbackGeo = new THREE.SphereGeometry(1, 10, 8);
+        const fallbackMat = new THREE.MeshStandardMaterial({ color: 0xffd700, emissive: 0xffa500, emissiveIntensity: 0.3, transparent: true, opacity: 0.7 });
+        markerGroup.add(new THREE.Mesh(fallbackGeo, fallbackMat));
+      }
+
+      this.scene.add(markerGroup);
+
+      // Subtle point light for visibility
+      const light = new THREE.PointLight(0xffd700, 1, 20);
       light.position.set(poi.x, 3, poi.z);
       this.scene.add(light);
 
-      this.oceanPOIs.push({ marker, light, ...poi });
+      this.oceanPOIs.push({ marker: markerGroup, light, ...poi });
     }
 
     // ── Particles ──
@@ -355,8 +512,15 @@ export class SailingScene extends GameScene {
     let nearPOI = false;
     for (const poi of this.oceanPOIs) {
       // Bob animation
-      poi.marker.position.y = 1.5 + Math.sin(this.time * 2 + poi.x) * 0.5;
-      poi.marker.rotation.y = this.time * 0.5;
+      poi.marker.position.y = Math.sin(this.time * 1.5 + poi.x) * 0.4;
+      poi.marker.rotation.y += dt * 0.3;
+
+      // Spin whirlpool rings
+      if (poi.label === 'Strange Current') {
+        for (const child of poi.marker.children) {
+          child.rotation.z += dt * (0.5 + child.geometry?.parameters?.radius * 0.1 || 0);
+        }
+      }
 
       // Check proximity
       const dx = shipPos.x - poi.x;
