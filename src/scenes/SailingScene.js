@@ -188,6 +188,7 @@ export class SailingScene extends GameScene {
     this.cameraHeight = 14;
     this.cameraAngle = 0;
 
+    this.input.reset();
     this.input.enablePointerLock();
 
     // Restore ship position if returning from island exploration

@@ -105,6 +105,8 @@ export class IslandExplorationScene extends GameScene {
     this.hud = new HUD();
     this.hud.show();
 
+    // Clear any held keys from sailing so player doesn't auto-move
+    this.input.reset();
     this.input.enablePointerLock();
   }
 

@@ -57,6 +57,15 @@ export class InputManager {
     }
   }
 
+  reset() {
+    this.keys = {};
+    this.keysJustPressed = {};
+    this.keysJustReleased = {};
+    this._prevKeys = {};
+    this.mouse.dx = 0;
+    this.mouse.dy = 0;
+  }
+
   isDown(code) {
     return !!this.keys[code];
   }
