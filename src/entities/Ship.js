@@ -41,7 +41,6 @@ function makePalette(sunPosition) {
 // ── Reusable geometries ──
 
 let _oarGeo = null;
-let _shieldGeo = null;
 
 function getOarGeometry() {
   if (_oarGeo) return _oarGeo;
@@ -97,27 +96,13 @@ function getOarGeometry() {
   return _oarGeo;
 }
 
-function getShieldGeometry() {
-  if (_shieldGeo) return _shieldGeo;
-  // Circle + boss + rim merged
-  const disc = new THREE.CircleGeometry(0.42, 10);
-  const boss = new THREE.SphereGeometry(0.1, 6, 4, 0, Math.PI * 2, 0, Math.PI / 2);
-  boss.translate(0, 0, 0.04);
-  const rim = new THREE.TorusGeometry(0.4, 0.035, 4, 12);
-  rim.translate(0, 0, 0.02);
-
-  // Simple approach: just use the disc as shield geo (boss/rim add too much complexity for instancing)
-  _shieldGeo = disc;
-  return _shieldGeo;
-}
-
 
 export class Ship {
   /**
    * @param {THREE.Vector3} sunPosition
    * @param {boolean} isNPC — if true, skips some detail for perf
    */
-  constructor(sunPosition, isNPC = false) {
+  constructor(sunPosition, isNPC = false, palette = null) {
     this.group = new THREE.Group();
     this.sunPosition = sunPosition;
     this.isNPC = isNPC;
@@ -125,13 +110,12 @@ export class Ship {
     this.targetSpeed = 0;
     this.heading = 0;
 
-    this.P = makePalette(sunPosition);
+    this.P = palette || makePalette(sunPosition);
 
     // Build modular parts
     this._buildHull();
     this._buildDeck();
     this._buildGunwale();
-    this._buildShields();
     this._buildMast();
     this._buildSail();
     this._buildOars();
@@ -145,6 +129,14 @@ export class Ship {
       this._buildWake();
       this._buildGreekPatterns();
     }
+
+    // Rotate mesh so the prow (+X) aligns with forward movement (+Z)
+    this.meshGroup = new THREE.Group();
+    this.meshGroup.rotation.y = -Math.PI / 2;
+    while (this.group.children.length > 0) {
+      this.meshGroup.add(this.group.children[0]);
+    }
+    this.group.add(this.meshGroup);
   }
 
   // ────────────────── HULL ──────────────────
@@ -256,74 +248,6 @@ export class Ship {
       cap.position.set(0, 3.88, side * 1.55);
       this.group.add(cap);
     }
-  }
-
-  // ────────────────── SHIELDS (instanced) ──────────────────
-
-  _buildShields() {
-    const shieldGeo = getShieldGeometry();
-    const shieldCount = 22; // 11 per side
-
-    // Alternate gold, red, blue, gold pattern
-    const colorSets = [
-      { color: 0xB8860B, roughness: 0.4, metallic: 0.5 },
-      { color: 0x8B1A1A, roughness: 0.6, metallic: 0.2 },
-      { color: 0x1A3A6A, roughness: 0.6, metallic: 0.2 },
-    ];
-
-    for (const cs of colorSets) {
-      const mat = new THREE.MeshStandardMaterial({
-        color: cs.color, roughness: cs.roughness, metalness: cs.metallic,
-      });
-      // Count how many shields use this color
-      let count = 0;
-      for (let i = 0; i < 11; i++) {
-        if (colorSets[i % 3] === cs) count += 2; // both sides
-      }
-
-      const mesh = new THREE.InstancedMesh(shieldGeo, mat, count);
-      const dummy = new THREE.Object3D();
-      let idx = 0;
-
-      for (let i = 0; i < 11; i++) {
-        if (colorSets[i % 3] !== cs) continue;
-        const x = -5 + i * 1.05;
-
-        for (let side = -1; side <= 1; side += 2) {
-          dummy.position.set(x, 3.65, side * 1.65);
-          dummy.rotation.y = side > 0 ? 0 : Math.PI;
-          dummy.scale.set(1, 1, 1);
-          dummy.updateMatrix();
-          mesh.setMatrixAt(idx++, dummy.matrix);
-        }
-      }
-
-      mesh.instanceMatrix.needsUpdate = true;
-      mesh.count = idx;
-      this.group.add(mesh);
-    }
-
-    // Shield bosses (center bumps) — instanced gold spheres
-    const bossGeo = new THREE.SphereGeometry(0.08, 5, 4, 0, Math.PI * 2, 0, Math.PI / 2);
-    const bossMat = new THREE.MeshStandardMaterial({
-      color: 0xC0A060, roughness: 0.3, metalness: 0.7,
-    });
-    const bossMesh = new THREE.InstancedMesh(bossGeo, bossMat, shieldCount);
-    const dummy = new THREE.Object3D();
-    let bIdx = 0;
-
-    for (let i = 0; i < 11; i++) {
-      const x = -5 + i * 1.05;
-      for (let side = -1; side <= 1; side += 2) {
-        dummy.position.set(x, 3.65, side * (1.65 + 0.03 * Math.sign(side)));
-        dummy.rotation.y = side > 0 ? 0 : Math.PI;
-        dummy.updateMatrix();
-        bossMesh.setMatrixAt(bIdx++, dummy.matrix);
-      }
-    }
-    bossMesh.instanceMatrix.needsUpdate = true;
-    bossMesh.count = bIdx;
-    this.group.add(bossMesh);
   }
 
   // ────────────────── MAST ──────────────────
@@ -832,7 +756,7 @@ export class Ship {
 
     // ── Ship movement ──
     if (input && !this.isNPC) {
-      const forward = input.getAxis('KeyS', 'KeyW');
+      const forward = input.getAxis('KeyW', 'KeyS');
       const turn = input.getAxis('KeyD', 'KeyA');
       this.targetSpeed = forward * SHIP.speed;
       this.heading += turn * SHIP.turnSpeed * dt;
