@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Odyssey</title>
+  <link rel="stylesheet" href="/styles/hud.css">
+</head>
+<body>
+  <div id="game-container">
+    <canvas id="game-canvas"></canvas>
+    <div id="hud" class="hud hidden">
+      <div id="health-bar" class="hud-bar">
+        <div class="bar-fill health-fill"></div>
+      </div>
+      <div id="stamina-bar" class="hud-bar">
+        <div class="bar-fill stamina-fill"></div>
+      </div>
+      <div id="compass"></div>
+      <div id="minimap"></div>
+      <div id="quest-log" class="hidden"></div>
+      <div id="interaction-prompt" class="hidden"></div>
+      <div id="sailing-hud" class="hidden">
+        <div id="wind-indicator"></div>
+        <div id="sail-trim"></div>
+        <div id="crew-count"></div>
+      </div>
+    </div>
+    <div id="cutscene-overlay" class="hidden">
+      <div id="cutscene-text"></div>
+      <div id="cutscene-skip">Press Space to skip</div>
+    </div>
+    <div id="menu-overlay" class="hidden">
+      <h1 class="menu-title">THE ODYSSEY</h1>
+      <p class="menu-subtitle">The Journey Home</p>
+      <button id="start-btn" class="menu-btn">Begin Journey</button>
+    </div>
+  </div>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
