@@ -4,6 +4,9 @@
  * Procedural heroic warrior with slightly exaggerated proportions.
  * Athletic build, wavy dark hair, short beard, Greek tunic,
  * leather armor, sandals, sword at waist, optional shield and cloak.
+ *
+ * Limbs use pivot-group hierarchy so rotations swing from joints
+ * (hips/shoulders/knees/elbows) instead of spinning around mesh centres.
  */
 
 import * as THREE from 'three';
@@ -176,101 +179,122 @@ export class Character {
       }
     }
 
-    // ── Arms — muscular upper + forearm ──
-    // Upper arms
+    // ── Arms — pivot-group hierarchy (shoulder → elbow) ──
     const upperArmGeo = new THREE.CylinderGeometry(0.09, 0.11, 0.45, 6);
-    this.leftUpperArm = new THREE.Mesh(upperArmGeo, skin);
-    this.leftUpperArm.position.set(-0.52, 1.75, 0);
-    this.leftUpperArm.castShadow = true;
-    this.group.add(this.leftUpperArm);
-
-    this.rightUpperArm = new THREE.Mesh(upperArmGeo.clone(), skin);
-    this.rightUpperArm.position.set(0.52, 1.75, 0);
-    this.rightUpperArm.castShadow = true;
-    this.group.add(this.rightUpperArm);
-
-    // Forearms
     const forearmGeo = new THREE.CylinderGeometry(0.07, 0.09, 0.45, 6);
-    this.leftArm = new THREE.Mesh(forearmGeo, skin);
-    this.leftArm.position.set(-0.52, 1.3, 0);
-    this.leftArm.castShadow = true;
-    this.group.add(this.leftArm);
 
-    this.rightArm = new THREE.Mesh(forearmGeo.clone(), skin);
-    this.rightArm.position.set(0.52, 1.3, 0);
-    this.rightArm.castShadow = true;
-    this.group.add(this.rightArm);
-
-    // Leather wrist guards
     for (let side = -1; side <= 1; side += 2) {
+      const prefix = side === -1 ? 'left' : 'right';
+
+      // Shoulder pivot — positioned at the shoulder joint
+      const armPivot = new THREE.Group();
+      armPivot.position.set(side * 0.52, 1.95, 0);
+      this.group.add(armPivot);
+
+      // Upper arm mesh — hangs down from shoulder pivot
+      const upperArm = new THREE.Mesh(
+        side === -1 ? upperArmGeo : upperArmGeo.clone(),
+        skin
+      );
+      upperArm.position.y = -0.22;
+      upperArm.castShadow = true;
+      armPivot.add(upperArm);
+
+      // Elbow / forearm pivot — at bottom of upper arm
+      const forearmPivot = new THREE.Group();
+      forearmPivot.position.y = -0.45;
+      armPivot.add(forearmPivot);
+
+      // Forearm mesh — hangs down from elbow pivot
+      const forearm = new THREE.Mesh(
+        side === -1 ? forearmGeo : forearmGeo.clone(),
+        skin
+      );
+      forearm.position.y = -0.22;
+      forearm.castShadow = true;
+      forearmPivot.add(forearm);
+
+      // Leather wrist guard
       const guardGeo = new THREE.CylinderGeometry(0.1, 0.1, 0.12, 6);
       const guard = new THREE.Mesh(guardGeo, leather);
-      guard.position.set(side * 0.52, 1.15, 0);
-      this.group.add(guard);
-    }
+      guard.position.y = -0.37;
+      forearmPivot.add(guard);
 
-    // Hands — simple spheres
-    for (let side = -1; side <= 1; side += 2) {
+      // Hand
       const handGeo = new THREE.SphereGeometry(0.06, 5, 5);
       const hand = new THREE.Mesh(handGeo, skin);
-      hand.position.set(side * 0.52, 1.05, 0);
-      this.group.add(hand);
+      hand.position.y = -0.45;
+      forearmPivot.add(hand);
+
+      this[prefix + 'ArmPivot'] = armPivot;
+      this[prefix + 'ForearmPivot'] = forearmPivot;
     }
 
-    // ── Legs — muscular thigh + calf ──
+    // ── Legs — pivot-group hierarchy (hip → knee) ──
     const thighGeo = new THREE.CylinderGeometry(0.11, 0.13, 0.5, 6);
-    this.leftLeg = new THREE.Mesh(thighGeo, skin);
-    this.leftLeg.position.set(-0.2, 0.5, 0);
-    this.leftLeg.castShadow = true;
-    this.group.add(this.leftLeg);
-
-    this.rightLeg = new THREE.Mesh(thighGeo.clone(), skin);
-    this.rightLeg.position.set(0.2, 0.5, 0);
-    this.rightLeg.castShadow = true;
-    this.group.add(this.rightLeg);
-
-    // Calves (slightly thinner)
     const calfGeo = new THREE.CylinderGeometry(0.07, 0.1, 0.5, 6);
-    this.leftCalf = new THREE.Mesh(calfGeo, skin);
-    this.leftCalf.position.set(-0.2, 0.05, 0);
-    this.group.add(this.leftCalf);
+    const soleMat = ShaderLib.createPBRMaterial({ color: 0x6B4C30, roughness: 0.9, metallic: 0.0, sunPosition });
 
-    this.rightCalf = new THREE.Mesh(calfGeo.clone(), skin);
-    this.rightCalf.position.set(0.2, 0.05, 0);
-    this.group.add(this.rightCalf);
-
-    // Leather shin guards (greaves)
     for (let side = -1; side <= 1; side += 2) {
+      const prefix = side === -1 ? 'left' : 'right';
+
+      // Hip pivot — positioned at the hip joint
+      const legPivot = new THREE.Group();
+      legPivot.position.set(side * 0.2, 0.75, 0);
+      this.group.add(legPivot);
+
+      // Thigh mesh — hangs down from hip pivot
+      const thigh = new THREE.Mesh(
+        side === -1 ? thighGeo : thighGeo.clone(),
+        skin
+      );
+      thigh.position.y = -0.25;
+      thigh.castShadow = true;
+      legPivot.add(thigh);
+
+      // Knee / calf pivot — at bottom of thigh
+      const calfPivot = new THREE.Group();
+      calfPivot.position.y = -0.5;
+      legPivot.add(calfPivot);
+
+      // Calf mesh — hangs down from knee pivot
+      const calf = new THREE.Mesh(
+        side === -1 ? calfGeo : calfGeo.clone(),
+        skin
+      );
+      calf.position.y = -0.25;
+      calfPivot.add(calf);
+
+      // Leather shin guard (greave)
       const greaveGeo = new THREE.CylinderGeometry(0.08, 0.09, 0.25, 6, 1, false, 0, Math.PI);
       const greave = new THREE.Mesh(greaveGeo, leather);
-      greave.position.set(side * 0.2, 0.1, 0.03);
-      this.group.add(greave);
-    }
+      greave.position.set(0, -0.2, 0.03);
+      calfPivot.add(greave);
 
-    // ── Sandals — Greek style with straps ──
-    const soleMat = ShaderLib.createPBRMaterial({ color: 0x6B4C30, roughness: 0.9, metallic: 0.0, sunPosition });
-    for (let side = -1; side <= 1; side += 2) {
-      // Sole
+      // Sandal sole
       const soleGeo = new THREE.BoxGeometry(0.14, 0.04, 0.28);
       const sole = new THREE.Mesh(soleGeo, soleMat);
-      sole.position.set(side * 0.2, -0.18, 0);
-      this.group.add(sole);
+      sole.position.y = -0.48;
+      calfPivot.add(sole);
 
       // Toe strap
       const toeStrap = new THREE.Mesh(
         new THREE.BoxGeometry(0.14, 0.03, 0.03),
         leather
       );
-      toeStrap.position.set(side * 0.2, -0.14, 0.08);
-      this.group.add(toeStrap);
+      toeStrap.position.set(0, -0.44, 0.08);
+      calfPivot.add(toeStrap);
 
       // Ankle strap
       const ankleStrap = new THREE.Mesh(
         new THREE.CylinderGeometry(0.08, 0.08, 0.03, 6),
         leather
       );
-      ankleStrap.position.set(side * 0.2, -0.1, 0);
-      this.group.add(ankleStrap);
+      ankleStrap.position.set(0, -0.4, 0);
+      calfPivot.add(ankleStrap);
+
+      this[prefix + 'LegPivot'] = legPivot;
+      this[prefix + 'CalfPivot'] = calfPivot;
     }
 
     // ── Sword at waist ──
@@ -371,18 +395,25 @@ export class Character {
     const walkSpeed = 5.5;
     const t = this.animTime * walkSpeed;
 
-    // Walk cycle values (smoothed by blend)
-    const legSwing = Math.sin(t) * 0.35 * wb;
-    const legSwingR = Math.sin(t + Math.PI) * 0.35 * wb;
-    const calfSwing = Math.sin(t + 0.3) * 0.2 * wb; // slight phase offset for natural bend
-    const calfSwingR = Math.sin(t + Math.PI + 0.3) * 0.2 * wb;
-    const armSwing = Math.sin(t + Math.PI) * 0.25 * wb;
-    const armSwingR = Math.sin(t) * 0.25 * wb;
-    const upperArmSwing = Math.sin(t + Math.PI) * 0.15 * wb;
-    const upperArmSwingR = Math.sin(t) * 0.15 * wb;
+    // ── Leg swing from hip pivots ──
+    const legSwingL = Math.sin(t) * 0.6 * wb;
+    const legSwingR = Math.sin(t + Math.PI) * 0.6 * wb;
+
+    // Calf bend — knee bends forward on the backstroke (when leg is behind)
+    // When legSwing < 0 the leg is behind the body → knee bends (positive x rotation)
+    const calfBendL = Math.max(0, -Math.sin(t)) * 0.5 * wb;
+    const calfBendR = Math.max(0, -Math.sin(t + Math.PI)) * 0.5 * wb;
+
+    // ── Arm swing from shoulder pivots (opposite to legs) ──
+    const armSwingL = Math.sin(t + Math.PI) * 0.45 * wb;
+    const armSwingR = Math.sin(t) * 0.45 * wb;
+
+    // Forearm — slight natural bend at elbow during swing
+    const forearmBendL = Math.max(0, -Math.sin(t + Math.PI)) * 0.3 * wb;
+    const forearmBendR = Math.max(0, -Math.sin(t)) * 0.3 * wb;
 
     // Bob — double-frequency for natural two-step bounce
-    const bob = Math.abs(Math.sin(t)) * 0.035 * wb;
+    const bob = Math.abs(Math.sin(t)) * 0.06 * wb;
 
     // Idle breathing
     const breath = Math.sin(this.animTime * 1.5) * 0.015 * (1 - wb);
@@ -390,17 +421,19 @@ export class Character {
     // Idle weight shift (subtle sway)
     const idleSway = Math.sin(this.animTime * 0.7) * 0.01 * (1 - wb);
 
-    // Apply
-    this.leftLeg.rotation.x = legSwing;
-    this.rightLeg.rotation.x = legSwingR;
-    if (this.leftCalf) this.leftCalf.rotation.x = calfSwing;
-    if (this.rightCalf) this.rightCalf.rotation.x = calfSwingR;
+    // ── Apply leg pivots ──
+    this.leftLegPivot.rotation.x = legSwingL;
+    this.rightLegPivot.rotation.x = legSwingR;
+    this.leftCalfPivot.rotation.x = calfBendL;
+    this.rightCalfPivot.rotation.x = calfBendR;
 
-    if (this.leftUpperArm) this.leftUpperArm.rotation.x = upperArmSwing;
-    if (this.rightUpperArm) this.rightUpperArm.rotation.x = upperArmSwingR;
-    this.leftArm.rotation.x = armSwing;
-    this.rightArm.rotation.x = armSwingR;
+    // ── Apply arm pivots ──
+    this.leftArmPivot.rotation.x = armSwingL;
+    this.rightArmPivot.rotation.x = armSwingR;
+    this.leftForearmPivot.rotation.x = forearmBendL;
+    this.rightForearmPivot.rotation.x = forearmBendR;
 
+    // ── Torso + head bob ──
     this.torso.position.y = 1.55 + bob + breath;
     this.head.position.y = 2.28 + bob + breath;
 
