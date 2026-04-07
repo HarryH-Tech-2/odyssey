@@ -762,11 +762,12 @@ export class Ship {
       this.figureheadLight.intensity = 1.2 + Math.sin(time * 2) * 0.5;
     }
 
-    // Ship movement
+    // Ship movement — hold Shift to boost speed
     if (input && !this.isNPC) {
       const forward = input.getAxis('KeyW', 'KeyS');
       const turn = input.getAxis('KeyD', 'KeyA');
-      this.targetSpeed = forward * SHIP.speed;
+      const boost = input.isDown('ShiftLeft') || input.isDown('ShiftRight') ? 2.5 : 1;
+      this.targetSpeed = forward * SHIP.speed * boost;
       this.heading += turn * SHIP.turnSpeed * dt;
     }
 
