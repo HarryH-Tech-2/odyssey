@@ -7,6 +7,12 @@ import { Sky } from '../entities/Sky.js';
 import { HUD } from '../ui/HUD.js';
 import { PLAYER } from '../utils/constants.js';
 
+const GRAVITY = 28;
+const JUMP_VELOCITY = 12;
+const MOVE_ACCEL = 40;
+const MOVE_DECEL = 18;
+const TURN_SPEED = 10;
+
 export class IslandExplorationScene extends GameScene {
   constructor(renderer, input, sceneManager) {
     super(renderer, input, sceneManager);
@@ -17,7 +23,6 @@ export class IslandExplorationScene extends GameScene {
     this.camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 2000);
     this.time = 0;
 
-    // Store transition data for return
     this.returnData = {
       shipPosition: data.shipPosition,
       shipHeading: data.shipHeading,
@@ -27,23 +32,43 @@ export class IslandExplorationScene extends GameScene {
     this.islandWorldX = data.islandWorldX;
     this.islandWorldZ = data.islandWorldZ;
 
-    const sunPosition = new THREE.Vector3(100, 40, -80);
+    const sunPosition = new THREE.Vector3(80, 50, -60);
 
-    // ── Lighting ──
-    const sunLight = new THREE.DirectionalLight(0xfff0dd, 2.5);
+    // ── Enhanced Lighting ──
+    // Main sun — warm, strong directional
+    const sunLight = new THREE.DirectionalLight(0xfff4e0, 3.0);
     sunLight.position.copy(sunPosition);
     sunLight.castShadow = true;
     sunLight.shadow.mapSize.set(2048, 2048);
-    sunLight.shadow.camera.far = 200;
-    sunLight.shadow.camera.left = -100;
-    sunLight.shadow.camera.right = 100;
-    sunLight.shadow.camera.top = 100;
-    sunLight.shadow.camera.bottom = -100;
+    sunLight.shadow.camera.far = 250;
+    sunLight.shadow.camera.left = -60;
+    sunLight.shadow.camera.right = 60;
+    sunLight.shadow.camera.top = 60;
+    sunLight.shadow.camera.bottom = -60;
+    sunLight.shadow.bias = -0.001;
+    sunLight.shadow.normalBias = 0.02;
     this.scene.add(sunLight);
-    this.scene.add(new THREE.AmbientLight(0x4466aa, 0.4));
-    this.scene.add(new THREE.HemisphereLight(0x87CEEB, 0x2a4a2a, 0.3));
+    this.scene.add(sunLight.target);
+    this.sunLight = sunLight;
 
-    this.scene.fog = new THREE.FogExp2(0x8aaabe, 0.002);
+    // Fill light from opposite side — cool blue
+    const fillLight = new THREE.DirectionalLight(0x8ab4d8, 0.6);
+    fillLight.position.set(-60, 30, 50);
+    this.scene.add(fillLight);
+
+    // Warm ambient for ground-level visibility
+    this.scene.add(new THREE.AmbientLight(0x665544, 0.5));
+
+    // Sky-to-ground hemisphere: sky blue above, warm earth below
+    this.scene.add(new THREE.HemisphereLight(0x87CEEB, 0x5a6a3a, 0.5));
+
+    // Rim/backlight for character pop
+    const rimLight = new THREE.DirectionalLight(0xffd4a0, 0.8);
+    rimLight.position.set(-40, 20, 80);
+    this.scene.add(rimLight);
+
+    // Softer, warmer fog for island atmosphere
+    this.scene.fog = new THREE.FogExp2(0xa8c4d0, 0.0015);
 
     // ── Ocean + Sky backdrop ──
     this.ocean = new Ocean(sunPosition);
@@ -53,7 +78,6 @@ export class IslandExplorationScene extends GameScene {
     this.sky.addTo(this.scene);
 
     // ── Add the island to this scene ──
-    // Clone and reset to origin — exploration scene is centered on the island
     this.islandGroup = this.island.group.clone();
     this.islandGroup.position.set(0, 0, 0);
     this.scene.add(this.islandGroup);
@@ -82,10 +106,15 @@ export class IslandExplorationScene extends GameScene {
     const spawnY = Math.max(this.island.sampleHeight(spawnX, spawnZ), 0.5);
     this.player.setPosition(spawnX, spawnY, spawnZ);
 
-    // Player state
+    // Player physics state
     this.playerPos = new THREE.Vector3(spawnX, spawnY, spawnZ);
+    this.playerVelocity = new THREE.Vector3(0, 0, 0);
     this.playerHeading = Math.atan2(toCenter.x, toCenter.y);
+    this.targetHeading = this.playerHeading;
+    this.currentSpeed = 0;
     this.moveSpeed = PLAYER.moveSpeed;
+    this.velocityY = 0;
+    this.isGrounded = true;
 
     // ── Third-person camera ──
     this.cameraDistance = 8;
@@ -105,7 +134,6 @@ export class IslandExplorationScene extends GameScene {
     this.hud = new HUD();
     this.hud.show();
 
-    // Clear any held keys from sailing so player doesn't auto-move
     this.input.reset();
     this.input.enablePointerLock();
   }
@@ -166,13 +194,14 @@ export class IslandExplorationScene extends GameScene {
       this.cameraElevation - mouseDelta.y * 0.003
     ));
 
-    // ── Player movement (WASD relative to camera azimuth) ──
+    // ── Player movement ──
     if (!this.showingDialogue) {
       const forward = this.input.getAxis('KeyS', 'KeyW');
       const strafe = this.input.getAxis('KeyA', 'KeyD');
-      const isMoving = forward !== 0 || strafe !== 0;
+      const wantsToMove = forward !== 0 || strafe !== 0;
 
-      if (isMoving) {
+      if (wantsToMove) {
+        // Movement direction relative to camera facing
         const moveAngle = this.cameraAzimuth + Math.PI;
         const moveX = Math.sin(moveAngle) * forward + Math.sin(moveAngle + Math.PI / 2) * strafe;
         const moveZ = Math.cos(moveAngle) * forward + Math.cos(moveAngle + Math.PI / 2) * strafe;
@@ -182,9 +211,15 @@ export class IslandExplorationScene extends GameScene {
           const nx = moveX / len;
           const nz = moveZ / len;
 
-          this.playerPos.x += nx * this.moveSpeed * dt;
-          this.playerPos.z += nz * this.moveSpeed * dt;
+          // Smooth acceleration
+          this.currentSpeed = Math.min(this.moveSpeed,
+            this.currentSpeed + MOVE_ACCEL * dt
+          );
 
+          this.playerPos.x += nx * this.currentSpeed * dt;
+          this.playerPos.z += nz * this.currentSpeed * dt;
+
+          // Clamp to island radius
           const distFromCenter = Math.sqrt(this.playerPos.x ** 2 + this.playerPos.z ** 2);
           if (distFromCenter > this.island.radius * 0.95) {
             const scale = (this.island.radius * 0.95) / distFromCenter;
@@ -192,13 +227,48 @@ export class IslandExplorationScene extends GameScene {
             this.playerPos.z *= scale;
           }
 
-          this.playerHeading = Math.atan2(nx, nz);
+          // Smooth heading rotation — don't snap
+          this.targetHeading = Math.atan2(nx, nz);
+        }
+      } else {
+        // Smooth deceleration
+        this.currentSpeed = Math.max(0, this.currentSpeed - MOVE_DECEL * dt);
+        if (this.currentSpeed > 0.1) {
+          // Continue drifting in last direction
+          const nx = Math.sin(this.playerHeading);
+          const nz = Math.cos(this.playerHeading);
+          this.playerPos.x += nx * this.currentSpeed * dt;
+          this.playerPos.z += nz * this.currentSpeed * dt;
+        } else {
+          this.currentSpeed = 0;
         }
       }
 
-      const groundY = this.island.sampleHeight(this.playerPos.x, this.playerPos.z);
-      this.playerPos.y = Math.max(groundY, 0.3);
+      // Smooth heading interpolation
+      let headingDiff = this.targetHeading - this.playerHeading;
+      while (headingDiff > Math.PI) headingDiff -= Math.PI * 2;
+      while (headingDiff < -Math.PI) headingDiff += Math.PI * 2;
+      this.playerHeading += headingDiff * Math.min(1, TURN_SPEED * dt);
 
+      // ── Jump ──
+      if (this.input.justPressed('Space') && this.isGrounded) {
+        this.velocityY = JUMP_VELOCITY;
+        this.isGrounded = false;
+      }
+
+      // Apply gravity
+      this.velocityY -= GRAVITY * dt;
+      this.playerPos.y += this.velocityY * dt;
+
+      // Ground collision
+      const groundY = Math.max(this.island.sampleHeight(this.playerPos.x, this.playerPos.z), 0.3);
+      if (this.playerPos.y <= groundY) {
+        this.playerPos.y = groundY;
+        this.velocityY = 0;
+        this.isGrounded = true;
+      }
+
+      const isMoving = this.currentSpeed > 0.5;
       this.player.setPosition(this.playerPos.x, this.playerPos.y, this.playerPos.z);
       this.player.setRotation(this.playerHeading);
       this.player.setWalking(isMoving);
@@ -207,6 +277,17 @@ export class IslandExplorationScene extends GameScene {
     }
 
     this.player.update(dt, this.time);
+
+    // ── Update shadow camera to follow player ──
+    if (this.sunLight) {
+      this.sunLight.target.position.copy(this.playerPos);
+      this.sunLight.target.updateMatrixWorld();
+      this.sunLight.position.set(
+        this.playerPos.x + 80,
+        50,
+        this.playerPos.z - 60
+      );
+    }
 
     // ── Camera follow ──
     const camOffsetX = Math.sin(this.cameraAzimuth) * this.cameraDistance * Math.cos(this.cameraElevation);
@@ -219,6 +300,7 @@ export class IslandExplorationScene extends GameScene {
       this.playerPos.z + camOffsetZ
     );
 
+    // Camera ground collision
     const camGroundY = this.island.sampleHeight(targetCamPos.x, targetCamPos.z);
     targetCamPos.y = Math.max(targetCamPos.y, camGroundY + 1.5);
 

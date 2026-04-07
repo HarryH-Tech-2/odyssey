@@ -263,14 +263,14 @@ export class Ship {
     this.mast.castShadow = true;
     this.group.add(this.mast);
 
-    // Upper yard arm
+    // Upper yard arm — perpendicular to keel (port to starboard)
     const yardGeo = new THREE.CylinderGeometry(0.06, 0.06, 8, 6);
-    yardGeo.rotateZ(Math.PI / 2);
+    yardGeo.rotateX(Math.PI / 2);
     this.group.add(new THREE.Mesh(yardGeo, this.P.wood).translateY(15).translateX(0.5));
 
     // Lower yard arm
     const lowerYard = new THREE.CylinderGeometry(0.05, 0.05, 7, 6);
-    lowerYard.rotateZ(Math.PI / 2);
+    lowerYard.rotateX(Math.PI / 2);
     this.group.add(new THREE.Mesh(lowerYard, this.P.wood).translateY(8.5).translateX(0.5));
 
     // Crow's nest platform
@@ -286,12 +286,14 @@ export class Ship {
   // ────────────────── SAIL (with wind billow + emblem) ──────────────────
 
   _buildSail() {
+    // Sail spans port-to-starboard (Z) and height (Y), facing fore/aft (X)
     const sailGeo = new THREE.PlaneGeometry(7.5, 7, 20, 20);
     this.sailMaterial = ShaderLib.createSailMaterial(this.sunPosition);
     this.sailMaterial.uniforms.uColor.value.set(0xF8F4EE); // off-white sail
 
     this.sail = new THREE.Mesh(sailGeo, this.sailMaterial);
-    this.sail.position.set(1.0, 11.8, 0);
+    this.sail.rotation.y = Math.PI / 2; // perpendicular to keel
+    this.sail.position.set(0.5, 11.8, 0);
     this.group.add(this.sail);
 
     // Blue stripe across sail center
@@ -301,13 +303,15 @@ export class Ship {
     });
     const stripeGeo = new THREE.PlaneGeometry(7.4, 1.2, 10, 4);
     const sailStripe = new THREE.Mesh(stripeGeo, stripeMat);
-    sailStripe.position.set(1.0, 11.8, 0.05);
+    sailStripe.rotation.y = Math.PI / 2;
+    sailStripe.position.set(0.55, 11.8, 0);
     this.group.add(sailStripe);
 
     // Thinner blue stripe below
     const stripeGeo2 = new THREE.PlaneGeometry(7.4, 0.5, 10, 2);
     const sailStripe2 = new THREE.Mesh(stripeGeo2, stripeMat);
-    sailStripe2.position.set(1.0, 10.0, 0.05);
+    sailStripe2.rotation.y = Math.PI / 2;
+    sailStripe2.position.set(0.55, 10.0, 0);
     this.group.add(sailStripe2);
 
     // Owl emblem on sail
@@ -362,7 +366,8 @@ export class Ship {
     }
 
     emblem.scale.set(1.6, 1.6, 1.6);
-    emblem.position.set(1.0, 12.5, 0.2);
+    emblem.rotation.y = Math.PI / 2; // face same direction as sail
+    emblem.position.set(0.6, 12.5, 0);
     this.group.add(emblem);
   }
 
@@ -565,16 +570,22 @@ export class Ship {
     const ropeMat = new THREE.LineBasicMaterial({ color: 0x8A7A65 });
 
     const lines = [
+      // Forestay (mast top to prow)
       [new THREE.Vector3(0.5, 16, 0), new THREE.Vector3(8.5, 5, 0)],
+      // Backstay (mast top to stern)
       [new THREE.Vector3(0.5, 16, 0), new THREE.Vector3(-7, 4.5, 0)],
+      // Shrouds (mast to deck sides)
       [new THREE.Vector3(0.5, 16, 0), new THREE.Vector3(-1, 3.1, 1.6)],
       [new THREE.Vector3(0.5, 16, 0), new THREE.Vector3(-1, 3.1, -1.6)],
       [new THREE.Vector3(0.5, 14, 0), new THREE.Vector3(2, 3.1, 1.6)],
       [new THREE.Vector3(0.5, 14, 0), new THREE.Vector3(2, 3.1, -1.6)],
-      [new THREE.Vector3(4.5, 15, 0), new THREE.Vector3(6, 3.5, 1)],
-      [new THREE.Vector3(-3.5, 15, 0), new THREE.Vector3(-5, 3.5, -1)],
-      [new THREE.Vector3(4, 8.5, 0), new THREE.Vector3(6, 3.5, -1)],
-      [new THREE.Vector3(-2.5, 8.5, 0), new THREE.Vector3(-5, 3.5, 1)],
+      // Braces (upper yard ends to deck — yard now runs along Z)
+      [new THREE.Vector3(0.5, 15, 4), new THREE.Vector3(4, 3.5, 1.5)],
+      [new THREE.Vector3(0.5, 15, -4), new THREE.Vector3(4, 3.5, -1.5)],
+      // Sheets (lower yard ends to stern)
+      [new THREE.Vector3(0.5, 8.5, 3.5), new THREE.Vector3(-5, 3.5, 1.2)],
+      [new THREE.Vector3(0.5, 8.5, -3.5), new THREE.Vector3(-5, 3.5, -1.2)],
+      // Halyard
       [new THREE.Vector3(0.5, 16, 0), new THREE.Vector3(0.5, 15, 0.3)],
     ];
 
