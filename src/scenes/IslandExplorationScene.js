@@ -557,6 +557,169 @@ export class IslandExplorationScene extends GameScene {
     }
   }
 
+
+  _buildCyclopsWorld(sunPosition) {
+    const r = this.island.radius;
+
+    // ── Dark, foreboding atmosphere ──
+    this.scene.fog = new THREE.FogExp2(0x3a4040, 0.002); // dark grey-green fog
+
+    // Dim, cold lighting
+    this.scene.add(new THREE.AmbientLight(0x334444, 0.4));
+    this.scene.add(new THREE.HemisphereLight(0x556666, 0x2a3a2a, 0.3));
+
+    // Harsh directional light casting long shadows
+    const harshLight = new THREE.DirectionalLight(0xccaa88, 1.5);
+    harshLight.position.set(50, 30, -40);
+    harshLight.castShadow = true;
+    this.scene.add(harshLight);
+
+    // ── Polyphemus's Cave — massive dark opening ──
+    const caveMat = new THREE.MeshStandardMaterial({ color: 0x3a3530, roughness: 0.95, metalness: 0.02 });
+    const darkMat = new THREE.MeshStandardMaterial({ color: 0x1a1510, roughness: 0.98 });
+
+    // Cave entrance — large arch made of boulders
+    const caveX = r * 0.15;
+    const caveZ = -r * 0.2;
+    const caveY = this.island.sampleHeight(caveX, caveZ);
+
+    // Massive boulder arch
+    for (let i = 0; i < 6; i++) {
+      const angle = (i / 6) * Math.PI;
+      const boulderGeo = new THREE.DodecahedronGeometry(2.5 + Math.random(), 1);
+      const boulder = new THREE.Mesh(boulderGeo, caveMat);
+      boulder.position.set(
+        caveX + Math.cos(angle) * 5,
+        caveY + Math.sin(angle) * 5,
+        caveZ
+      );
+      boulder.scale.set(
+        1 + Math.random() * 0.5,
+        0.8 + Math.random() * 0.4,
+        1.5 + Math.random() * 0.5
+      );
+      boulder.rotation.set(Math.random(), Math.random(), Math.random());
+      boulder.castShadow = true;
+      this.scene.add(boulder);
+    }
+
+    // Dark cave interior (recessed dark plane)
+    const caveInterior = new THREE.Mesh(
+      new THREE.CircleGeometry(4, 12),
+      darkMat
+    );
+    caveInterior.position.set(caveX, caveY + 3, caveZ - 2);
+    this.scene.add(caveInterior);
+
+    // Faint orange glow from inside (fire)
+    const caveFireLight = new THREE.PointLight(0xff6622, 1.5, 15);
+    caveFireLight.position.set(caveX, caveY + 2, caveZ - 1);
+    this.scene.add(caveFireLight);
+    this._caveFireLight = caveFireLight;
+
+    // ── Giant footprints — depressions in the ground ──
+    const footprintMat = new THREE.MeshStandardMaterial({
+      color: 0x5a5040,
+      roughness: 0.95,
+    });
+    const footprintPositions = [
+      { x: r * 0.05, z: r * 0.1 },
+      { x: r * 0.1, z: r * 0.0 },
+      { x: r * 0.15, z: -r * 0.1 },
+      { x: r * 0.12, z: -r * 0.2 },
+    ];
+    for (const fp of footprintPositions) {
+      const fy = this.island.sampleHeight(fp.x, fp.z);
+      if (fy < 0.3) continue;
+      const print = new THREE.Mesh(
+        new THREE.BoxGeometry(2, 0.15, 3.5),
+        footprintMat
+      );
+      print.position.set(fp.x, fy - 0.05, fp.z);
+      print.rotation.y = Math.atan2(fp.x, fp.z) + 0.2;
+      this.scene.add(print);
+    }
+
+    // ── Sheep pen — crude stone enclosure ──
+    const penX = -r * 0.15;
+    const penZ = r * 0.1;
+    const penY = this.island.sampleHeight(penX, penZ);
+    const wallMat = new THREE.MeshStandardMaterial({ color: 0x6a6258, roughness: 0.92 });
+
+    // Stone wall ring (open on one side)
+    for (let i = 0; i < 10; i++) {
+      const angle = (i / 12) * Math.PI * 2;
+      const wallBlock = new THREE.Mesh(
+        new THREE.BoxGeometry(1.5, 1.2, 0.8),
+        wallMat
+      );
+      wallBlock.position.set(
+        penX + Math.cos(angle) * 5,
+        penY + 0.6,
+        penZ + Math.sin(angle) * 5
+      );
+      wallBlock.rotation.y = angle;
+      wallBlock.castShadow = true;
+      this.scene.add(wallBlock);
+    }
+
+    // ── Massive scattered boulders — scale of the Cyclops ──
+    for (let i = 0; i < 8; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const dist = r * 0.15 + Math.random() * r * 0.3;
+      const bx = Math.cos(angle) * dist;
+      const bz = Math.sin(angle) * dist;
+      const by = this.island.sampleHeight(bx, bz);
+      if (by < 0.5) continue;
+
+      const boulderGeo = new THREE.DodecahedronGeometry(1.5 + Math.random() * 2, 1);
+      const boulder = new THREE.Mesh(boulderGeo, caveMat);
+      boulder.position.set(bx, by + 0.5, bz);
+      boulder.scale.set(1, 0.6 + Math.random() * 0.4, 1);
+      boulder.rotation.set(Math.random() * 0.3, Math.random() * Math.PI, Math.random() * 0.3);
+      boulder.castShadow = true;
+      this.scene.add(boulder);
+    }
+
+    // ── Sharpened olive stake (the weapon) ──
+    const stakeX = caveX + 6;
+    const stakeZ = caveZ + 3;
+    const stakeY = this.island.sampleHeight(stakeX, stakeZ);
+    const stakeMat = new THREE.MeshStandardMaterial({ color: 0x6a5a40, roughness: 0.85 });
+    const stake = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.08, 0.2, 4, 6),
+      stakeMat
+    );
+    stake.position.set(stakeX, stakeY + 1, stakeZ);
+    stake.rotation.z = 0.15;
+    stake.rotation.x = 0.1;
+    this.scene.add(stake);
+
+    // Charred tip
+    const tipMat = new THREE.MeshStandardMaterial({ color: 0x1a1008, roughness: 0.95 });
+    const tip = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.5, 5), tipMat);
+    tip.position.set(stakeX + 0.3, stakeY + 3.1, stakeZ + 0.2);
+    tip.rotation.z = 0.15;
+    this.scene.add(tip);
+
+    // ── Coastal boulders (thrown by Polyphemus) ──
+    for (let i = 0; i < 5; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const dist = r * 0.7 + Math.random() * r * 0.2;
+      const bx = Math.cos(angle) * dist;
+      const bz = Math.sin(angle) * dist;
+
+      const thrownRock = new THREE.Mesh(
+        new THREE.DodecahedronGeometry(2 + Math.random() * 1.5, 1),
+        caveMat
+      );
+      thrownRock.position.set(bx, 0.5, bz);
+      thrownRock.scale.set(1, 0.5 + Math.random() * 0.5, 1);
+      thrownRock.rotation.set(Math.random(), Math.random(), Math.random());
+      this.scene.add(thrownRock);
+    }
+  }
+
   _generateWindingPath(radius) {
     const points = [];
     const steps = 50;
@@ -1118,6 +1281,12 @@ export class IslandExplorationScene extends GameScene {
         pos.setXYZ(i, p.x, p.y, p.z);
       }
       pos.needsUpdate = true;
+    }
+
+
+    // ── Cyclops world animation ──
+    if (this._caveFireLight) {
+      this._caveFireLight.intensity = 1.2 + Math.sin(this.time * 6) * 0.5 + Math.sin(this.time * 9.3) * 0.3;
     }
 
     // ── Interaction checks ──
