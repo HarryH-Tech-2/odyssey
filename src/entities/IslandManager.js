@@ -167,6 +167,24 @@ export class IslandManager {
     }
   }
 
+  /** Find the nearest island to a world position, with distance */
+  getNearestIsland(x, z) {
+    let nearest = null;
+    let minDist = Infinity;
+    for (const [, entry] of this.loaded) {
+      if (!entry || !entry.island) continue;
+      const dx = entry.worldX - x;
+      const dz = entry.worldZ - z;
+      const dist = Math.sqrt(dx * dx + dz * dz);
+      const shoreDistance = dist - entry.data.radius;
+      if (shoreDistance < minDist) {
+        minDist = shoreDistance;
+        nearest = entry;
+      }
+    }
+    return nearest ? { entry: nearest, shoreDistance: minDist } : null;
+  }
+
   /** Get all loaded island positions + labels for minimap */
   getIslandMarkers() {
     const markers = [];

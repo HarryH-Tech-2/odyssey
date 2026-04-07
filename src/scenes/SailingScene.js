@@ -272,6 +272,24 @@ export class SailingScene extends GameScene {
     this.minimap.update(shipPos.x, shipPos.z, this.ship.heading);
 
     this.sailingHUD.update(this.windAngle, this.sailTrim, this.crewCount);
+
+    // ── Island proximity — disembark prompt ──
+    const nearest = this.islandManager.getNearestIsland(shipPos.x, shipPos.z);
+    if (nearest && nearest.shoreDistance < 20) {
+      this.hud.showInteraction('Press E to disembark');
+      if (this.input.justPressed('KeyE')) {
+        this.sceneManager.switchTo('islandExploration', {
+          island: nearest.entry.island,
+          islandData: nearest.entry.data,
+          islandWorldX: nearest.entry.worldX,
+          islandWorldZ: nearest.entry.worldZ,
+          shipPosition: shipPos.clone(),
+          shipHeading: this.ship.heading,
+        });
+      }
+    } else {
+      this.hud.hideInteraction();
+    }
   }
 
   render(renderer) {
