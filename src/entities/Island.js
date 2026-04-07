@@ -286,8 +286,8 @@ export class Island {
     this.group.add(mesh);
   }
 
-  /** Sample terrain height at local (x,z) — used for placing objects */
-  _sampleHeight(x, z) {
+  /** Sample terrain height at local (x,z) — used for placing objects and character ground following */
+  sampleHeight(x, z) {
     const dist = Math.sqrt(x * x + z * z) / this.radius;
     const falloff = Math.max(0, 1 - dist * dist);
     const edgeFalloff = falloff * falloff * (3 - 2 * falloff);
@@ -333,7 +333,7 @@ export class Island {
         const dist = rng.range(0.15, 0.7) * radius;
         const x = Math.cos(angle) * dist;
         const z = Math.sin(angle) * dist;
-        const y = this._sampleHeight(x, z);
+        const y = this.sampleHeight(x, z);
 
         // Only place on grass elevation band
         const normH = y / height;
@@ -376,7 +376,7 @@ export class Island {
       const dist = rng.range(0.1, 0.95) * radius;
       const x = Math.cos(angle) * dist;
       const z = Math.sin(angle) * dist;
-      const y = this._sampleHeight(x, z);
+      const y = this.sampleHeight(x, z);
 
       if (y < 0.5) continue;
 
@@ -422,7 +422,7 @@ export class Island {
     for (let i = 0; i < colCount * 3 && placed < colCount; i++) {
       const x = cx + rng.range(-radius * 0.2, radius * 0.2);
       const z = cz + rng.range(-radius * 0.2, radius * 0.2);
-      const y = this._sampleHeight(x, z);
+      const y = this.sampleHeight(x, z);
 
       const normH = y / height;
       if (normH < 0.05 || normH > 0.6) continue;
@@ -445,7 +445,7 @@ export class Island {
     // Temple platform (single larger piece at cluster center)
     const platformGeo = new THREE.BoxGeometry(4, 0.5, 3);
     const platform = new THREE.Mesh(platformGeo, ruinsMat);
-    const py = this._sampleHeight(cx, cz);
+    const py = this.sampleHeight(cx, cz);
     platform.position.set(cx, py + 0.25, cz);
     platform.rotation.y = rng.next() * Math.PI;
     platform.castShadow = true;
@@ -492,7 +492,7 @@ export class Island {
       opacity: 0.4,
     });
     const orb = new THREE.Mesh(orbGeo, orbMat);
-    orb.position.set(bx, this._sampleHeight(bx, bz) + 1.5, bz);
+    orb.position.set(bx, this.sampleHeight(bx, bz) + 1.5, bz);
     this.group.add(orb);
     this.magicOrb = orb;
 
