@@ -138,8 +138,318 @@ export class IslandExplorationScene extends GameScene {
     this.hud = new HUD();
     this.hud.show();
 
+    // ── Lotus Eaters custom world ──
+    this.lotusElements = [];
+    this.pollenParticles = null;
+    this.mistLayers = [];
+    this.isLotusIsland = (this.island.label === 'Land of the Lotus Eaters');
+    if (this.isLotusIsland) {
+      this._buildLotusEatersWorld(sunPosition);
+    }
+
     this.input.reset();
     this.input.enablePointerLock();
+  }
+
+  _buildLotusEatersWorld(sunPosition) {
+    const r = this.island.radius;
+
+    // ── Override lighting to pastel dreamlike tones ──
+    // Remove existing lights and replace
+    this.scene.fog = new THREE.FogExp2(0xd8c0d8, 0.003); // lavender haze
+
+    // Dreamy pastel ambient
+    this.scene.add(new THREE.AmbientLight(0xc8a0c8, 0.6)); // lavender ambient
+    this.scene.add(new THREE.HemisphereLight(0xe8c0e0, 0x8aaa6a, 0.5)); // pink sky, green ground
+
+    // Warm golden sun with pink tint
+    const lotusLight = new THREE.DirectionalLight(0xffd8c0, 2.0);
+    lotusLight.position.set(40, 40, -30);
+    this.scene.add(lotusLight);
+
+    // Soft pink fill from behind
+    const pinkFill = new THREE.DirectionalLight(0xffaacc, 0.5);
+    pinkFill.position.set(-30, 20, 40);
+    this.scene.add(pinkFill);
+
+    // ── Winding path from beach to center ──
+    // Path is a series of flat boxes with glowing material
+    const pathMat = new THREE.MeshStandardMaterial({
+      color: 0xf0e0c0,
+      emissive: 0xffd080,
+      emissiveIntensity: 0.15,
+      roughness: 0.9,
+    });
+    const pathPoints = this._generateWindingPath(r);
+    for (let i = 0; i < pathPoints.length; i++) {
+      const p = pathPoints[i];
+      const y = this.island.sampleHeight(p.x, p.z);
+      if (y < 0.2) continue;
+      const pathSeg = new THREE.Mesh(
+        new THREE.BoxGeometry(2.5, 0.05, 2.5),
+        pathMat
+      );
+      pathSeg.position.set(p.x, y + 0.05, p.z);
+      pathSeg.rotation.y = Math.atan2(
+        (pathPoints[Math.min(i + 1, pathPoints.length - 1)].x - p.x),
+        (pathPoints[Math.min(i + 1, pathPoints.length - 1)].z - p.z)
+      );
+      pathSeg.receiveShadow = true;
+      this.scene.add(pathSeg);
+    }
+
+    // ── Bioluminescent plants along the path ──
+    const glowPlantMat = new THREE.MeshStandardMaterial({
+      color: 0x88ffcc,
+      emissive: 0x44ddaa,
+      emissiveIntensity: 0.6,
+      transparent: true,
+      opacity: 0.8,
+    });
+    const pinkPlantMat = new THREE.MeshStandardMaterial({
+      color: 0xff88cc,
+      emissive: 0xff66aa,
+      emissiveIntensity: 0.5,
+      transparent: true,
+      opacity: 0.8,
+    });
+    for (let i = 0; i < pathPoints.length; i += 3) {
+      const p = pathPoints[i];
+      const y = this.island.sampleHeight(p.x, p.z);
+      if (y < 0.5) continue;
+      for (let side = -1; side <= 1; side += 2) {
+        const offset = 2.5 + Math.random() * 2;
+        const px = p.x + side * offset * Math.cos(i);
+        const pz = p.z + side * offset * Math.sin(i);
+        const py = this.island.sampleHeight(px, pz);
+
+        const mat = Math.random() > 0.5 ? glowPlantMat : pinkPlantMat;
+        // Stem
+        const stem = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.03, 0.05, 0.6, 5),
+          new THREE.MeshStandardMaterial({ color: 0x447744, roughness: 0.8 })
+        );
+        stem.position.set(px, py + 0.3, pz);
+        this.scene.add(stem);
+
+        // Glowing bulb
+        const bulb = new THREE.Mesh(
+          new THREE.SphereGeometry(0.15 + Math.random() * 0.1, 7, 5),
+          mat
+        );
+        bulb.position.set(px, py + 0.7, pz);
+        this.scene.add(bulb);
+        this.lotusElements.push(bulb);
+
+        // Tiny point light
+        if (i % 6 === 0) {
+          const plantLight = new THREE.PointLight(
+            mat === glowPlantMat ? 0x44ddaa : 0xff66aa,
+            0.5, 5
+          );
+          plantLight.position.set(px, py + 0.8, pz);
+          this.scene.add(plantLight);
+        }
+      }
+    }
+
+    // ── Large lotus flowers in the central clearing ──
+    const lotusFlowerMat = new THREE.MeshStandardMaterial({
+      color: 0xffaadd,
+      emissive: 0xff88bb,
+      emissiveIntensity: 0.7,
+      transparent: true,
+      opacity: 0.9,
+    });
+    const lotusCoreMat = new THREE.MeshStandardMaterial({
+      color: 0xffd700,
+      emissive: 0xffaa00,
+      emissiveIntensity: 1.0,
+    });
+
+    const lotusPositions = [
+      { x: 0, z: 0 },
+      { x: r * 0.08, z: r * 0.1 },
+      { x: -r * 0.06, z: r * 0.08 },
+      { x: r * 0.1, z: -r * 0.05 },
+      { x: -r * 0.12, z: -r * 0.04 },
+      { x: r * 0.03, z: -r * 0.12 },
+      { x: -r * 0.08, z: r * 0.15 },
+      { x: r * 0.15, z: r * 0.05 },
+    ];
+
+    for (const lp of lotusPositions) {
+      const ly = this.island.sampleHeight(lp.x, lp.z);
+      if (ly < 0.3) continue;
+      const lotusGroup = new THREE.Group();
+      lotusGroup.position.set(lp.x, ly, lp.z);
+
+      // Stem
+      const stem = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.05, 0.08, 1.2, 6),
+        new THREE.MeshStandardMaterial({ color: 0x448844, roughness: 0.8 })
+      );
+      stem.position.y = 0.6;
+      lotusGroup.add(stem);
+
+      // Petals — ring of angled planes
+      for (let p = 0; p < 8; p++) {
+        const angle = (p / 8) * Math.PI * 2;
+        const petal = new THREE.Mesh(
+          new THREE.PlaneGeometry(0.5, 0.8),
+          lotusFlowerMat
+        );
+        petal.material = lotusFlowerMat.clone();
+        petal.position.set(
+          Math.cos(angle) * 0.3,
+          1.3,
+          Math.sin(angle) * 0.3
+        );
+        petal.rotation.y = -angle;
+        petal.rotation.x = -0.5;
+        lotusGroup.add(petal);
+      }
+
+      // Glowing core
+      const core = new THREE.Mesh(
+        new THREE.SphereGeometry(0.15, 8, 6),
+        lotusCoreMat
+      );
+      core.position.y = 1.3;
+      lotusGroup.add(core);
+
+      // Point light per flower
+      const flowerLight = new THREE.PointLight(0xff88cc, 1.5, 8);
+      flowerLight.position.y = 1.5;
+      lotusGroup.add(flowerLight);
+
+      this.scene.add(lotusGroup);
+      this.lotusElements.push(lotusGroup);
+    }
+
+    // Central clearing glow disc
+    const clearingGlow = new THREE.Mesh(
+      new THREE.CircleGeometry(r * 0.2, 32),
+      new THREE.MeshBasicMaterial({
+        color: 0xffccee,
+        transparent: true,
+        opacity: 0.1,
+        depthWrite: false,
+      })
+    );
+    clearingGlow.rotation.x = -Math.PI / 2;
+    clearingGlow.position.set(0, this.island.sampleHeight(0, 0) + 0.1, 0);
+    this.scene.add(clearingGlow);
+
+    // ── Floating pollen particle system ──
+    const pollenCount = 200;
+    const pollenGeo = new THREE.BufferGeometry();
+    const pollenPositions = new Float32Array(pollenCount * 3);
+    this._pollenData = [];
+    for (let i = 0; i < pollenCount; i++) {
+      const px = (Math.random() - 0.5) * r * 1.2;
+      const pz = (Math.random() - 0.5) * r * 1.2;
+      const py = this.island.sampleHeight(px, pz) + 1 + Math.random() * 4;
+      pollenPositions[i * 3] = px;
+      pollenPositions[i * 3 + 1] = Math.max(py, 1);
+      pollenPositions[i * 3 + 2] = pz;
+      this._pollenData.push({ x: px, y: Math.max(py, 1), z: pz, phase: Math.random() * Math.PI * 2 });
+    }
+    pollenGeo.setAttribute('position', new THREE.BufferAttribute(pollenPositions, 3));
+    const pollenMat = new THREE.PointsMaterial({
+      color: 0xffeedd,
+      size: 0.15,
+      transparent: true,
+      opacity: 0.6,
+      depthWrite: false,
+      sizeAttenuation: true,
+    });
+    this.pollenParticles = new THREE.Points(pollenGeo, pollenMat);
+    this.scene.add(this.pollenParticles);
+
+    // ── Mist layers that thicken toward the center ──
+    for (let i = 0; i < 5; i++) {
+      const dist = r * 0.1 + i * r * 0.08;
+      const mistGeo = new THREE.CircleGeometry(r * 0.25 - i * 2, 24);
+      mistGeo.rotateX(-Math.PI / 2);
+      const mistMat = new THREE.MeshBasicMaterial({
+        color: 0xe0c8e0,
+        transparent: true,
+        opacity: 0.06 + i * 0.02,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+      });
+      const mist = new THREE.Mesh(mistGeo, mistMat);
+      mist.position.set(
+        (Math.random() - 0.5) * dist * 0.3,
+        this.island.sampleHeight(0, 0) + 0.5 + i * 0.3,
+        (Math.random() - 0.5) * dist * 0.3
+      );
+      this.scene.add(mist);
+      this.mistLayers.push(mist);
+    }
+
+    // ── Dreamy palm trees with warm-tinted trunks ──
+    const palmTrunkMat = new THREE.MeshStandardMaterial({ color: 0x8B7355, roughness: 0.85 });
+    const palmLeafMat = new THREE.MeshStandardMaterial({ color: 0x5aaa44, roughness: 0.7 });
+    for (let i = 0; i < 15; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const dist = r * 0.2 + Math.random() * r * 0.4;
+      const px = Math.cos(angle) * dist;
+      const pz = Math.sin(angle) * dist;
+      const py = this.island.sampleHeight(px, pz);
+      if (py < 0.5) continue;
+
+      const palm = new THREE.Group();
+      // Curved trunk
+      const trunkHeight = 3 + Math.random() * 3;
+      const trunk = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.08, 0.15, trunkHeight, 6),
+        palmTrunkMat
+      );
+      trunk.position.y = trunkHeight / 2;
+      // Slight lean
+      trunk.rotation.z = (Math.random() - 0.5) * 0.2;
+      trunk.rotation.x = (Math.random() - 0.5) * 0.15;
+      palm.add(trunk);
+
+      // Leaf fronds — radiating planes
+      for (let f = 0; f < 7; f++) {
+        const fAngle = (f / 7) * Math.PI * 2;
+        const frond = new THREE.Mesh(
+          new THREE.PlaneGeometry(0.6, 2.5),
+          palmLeafMat
+        );
+        frond.material = palmLeafMat; // shared is fine
+        frond.position.set(
+          Math.cos(fAngle) * 0.5,
+          trunkHeight + 0.3,
+          Math.sin(fAngle) * 0.5
+        );
+        frond.rotation.y = -fAngle;
+        frond.rotation.x = -0.8 - Math.random() * 0.4;
+        palm.add(frond);
+      }
+
+      palm.position.set(px, py, pz);
+      palm.castShadow = true;
+      this.scene.add(palm);
+    }
+  }
+
+  _generateWindingPath(radius) {
+    const points = [];
+    const steps = 25;
+    // Path from edge (where player spawns) winding to center
+    for (let i = 0; i < steps; i++) {
+      const t = i / (steps - 1);
+      const dist = radius * 0.6 * (1 - t); // from outer to center
+      const windAngle = t * Math.PI * 1.5 + 0.5; // spiral inward
+      const x = Math.cos(windAngle) * dist;
+      const z = Math.sin(windAngle) * dist;
+      points.push({ x, z });
+    }
+    return points;
   }
 
   _spawnNPCs(sunPosition) {
@@ -521,6 +831,50 @@ export class IslandExplorationScene extends GameScene {
     // ── NPC idle animation ──
     for (const npc of this.npcs) {
       npc.update(dt, this.time);
+    }
+
+    // ── Lotus Eaters world animation ──
+    if (this.isLotusIsland) {
+      // Pulse lotus flowers and bioluminescent plants
+      for (let i = 0; i < this.lotusElements.length; i++) {
+        const el = this.lotusElements[i];
+        if (el.isGroup) {
+          // Lotus flower group — gentle sway
+          el.rotation.y = Math.sin(this.time * 0.3 + i) * 0.05;
+          // Pulse the lights inside
+          el.children.forEach(child => {
+            if (child.isLight) {
+              child.intensity = 1.0 + Math.sin(this.time * 2 + i * 0.7) * 0.8;
+            }
+          });
+        } else if (el.isMesh) {
+          // Bioluminescent bulbs — pulse emissive
+          if (el.material && el.material.emissiveIntensity !== undefined) {
+            el.material.emissiveIntensity = 0.4 + Math.sin(this.time * 2.5 + i * 0.5) * 0.3;
+          }
+        }
+      }
+
+      // Animate pollen particles — gentle drift
+      if (this.pollenParticles) {
+        const pollenPos = this.pollenParticles.geometry.attributes.position;
+        for (let i = 0; i < this._pollenData.length; i++) {
+          const p = this._pollenData[i];
+          p.x += Math.sin(this.time * 0.5 + p.phase) * dt * 0.3;
+          p.y += Math.sin(this.time * 0.8 + p.phase * 2) * dt * 0.2;
+          p.z += Math.cos(this.time * 0.4 + p.phase) * dt * 0.3;
+          pollenPos.setXYZ(i, p.x, p.y, p.z);
+        }
+        pollenPos.needsUpdate = true;
+      }
+
+      // Drift mist layers
+      for (let i = 0; i < this.mistLayers.length; i++) {
+        const mist = this.mistLayers[i];
+        mist.position.x += Math.sin(this.time * 0.3 + i) * dt * 0.2;
+        mist.position.z += Math.cos(this.time * 0.25 + i * 2) * dt * 0.15;
+        mist.material.opacity = 0.06 + i * 0.02 + Math.sin(this.time + i) * 0.01;
+      }
     }
 
     // ── Interaction checks ──
