@@ -401,7 +401,7 @@ export class IslandExplorationScene extends GameScene {
     // ── Player movement ──
     if (!this.showingDialogue) {
       const forward = this.input.getAxis('KeyS', 'KeyW');
-      const strafe = this.input.getAxis('KeyA', 'KeyD');
+      const strafe = this.input.getAxis('KeyD', 'KeyA');
       const wantsToMove = forward !== 0 || strafe !== 0;
 
       if (wantsToMove) {
