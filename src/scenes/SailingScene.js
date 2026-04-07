@@ -397,11 +397,16 @@ export class SailingScene extends GameScene {
     this.sailingHUD = new SailingHUD();
     this.sailingHUD.show();
 
-    this.questLog.setObjective('Sail to the Land of the Lotus Eaters');
+    // Quest progression — follows the Odyssey
+    this.questStages = [
+      { objective: 'Sail to the Land of the Lotus Eaters', target: { x: 200, z: -300 }, label: 'Land of the Lotus Eaters' },
+      { objective: 'Sail to the Island of the Cyclops', target: { x: -250, z: -600 }, label: 'Cyclops Island' },
+      { objective: 'Seek Aeolus, Keeper of the Winds', target: { x: 700, z: -650 }, label: 'Aeolus' },
+    ];
 
-    // Quest target: Lotus Eaters island world position
-    this.questTarget = { x: 200, z: -300 };
-    this.minimap.setQuestTarget(this.questTarget);
+    // Restore quest stage if returning from island, otherwise start from saved or 0
+    this.currentQuestStage = (data && data.questStage !== undefined) ? data.questStage : 0;
+    this._updateQuest();
 
     // Player state
     this.health = PLAYER.maxHealth;
@@ -423,6 +428,27 @@ export class SailingScene extends GameScene {
       this.ship.group.position.copy(data.shipPosition);
       this.ship.heading = data.shipHeading || 0;
       this.ship.group.rotation.y = this.ship.heading;
+
+      // Advance quest if player visited the current quest's target island
+      if (data.questLabel && this.currentQuestStage < this.questStages.length) {
+        if (data.questLabel === this.questStages[this.currentQuestStage].label) {
+          this.currentQuestStage++;
+          this._updateQuest();
+        }
+      }
+    }
+  }
+
+  _updateQuest() {
+    if (this.currentQuestStage < this.questStages.length) {
+      const quest = this.questStages[this.currentQuestStage];
+      this.questLog.setObjective(quest.objective);
+      this.questTarget = quest.target;
+      this.minimap.setQuestTarget(this.questTarget);
+    } else {
+      this.questLog.setObjective('Explore the wine-dark sea...');
+      this.questTarget = { x: 0, z: -1000 };
+      this.minimap.setQuestTarget(this.questTarget);
     }
   }
 
@@ -510,46 +536,48 @@ export class SailingScene extends GameScene {
 
     // ── Ocean POI proximity + animation ──
     let nearPOI = false;
-    for (const poi of this.oceanPOIs) {
-      // Bob animation
-      poi.marker.position.y = Math.sin(this.time * 1.5 + poi.x) * 0.4;
-      poi.marker.rotation.y += dt * 0.3;
+    if (this._showingPOI) {
+      nearPOI = true;
+      // Dismiss on next E press (not the same frame that opened it)
+      if (this.input.justPressed('KeyE') || this.input.justPressed('Space')) {
+        const overlay = document.getElementById('cutscene-overlay');
+        const textEl = document.getElementById('cutscene-text');
+        overlay.classList.add('hidden');
+        textEl.classList.remove('visible');
+        this._showingPOI = false;
+      }
+    } else {
+      for (const poi of this.oceanPOIs) {
+        // Bob animation
+        poi.marker.position.y = Math.sin(this.time * 1.5 + poi.x) * 0.4;
+        poi.marker.rotation.y += dt * 0.3;
 
-      // Spin whirlpool rings
-      if (poi.label === 'Strange Current') {
-        for (const child of poi.marker.children) {
-          child.rotation.z += dt * (0.5 + child.geometry?.parameters?.radius * 0.1 || 0);
+        // Spin whirlpool rings
+        if (poi.label === 'Strange Current') {
+          for (const child of poi.marker.children) {
+            child.rotation.z += dt * (0.5 + (child.geometry?.parameters?.radius || 0) * 0.1);
+          }
+        }
+
+        // Check proximity
+        const dx = shipPos.x - poi.x;
+        const dz = shipPos.z - poi.z;
+        const dist = Math.sqrt(dx * dx + dz * dz);
+        if (dist < 25) {
+          nearPOI = true;
+          this.hud.showInteraction(`Press E: ${poi.label}`);
+          if (this.input.justPressed('KeyE')) {
+            const overlay = document.getElementById('cutscene-overlay');
+            const textEl = document.getElementById('cutscene-text');
+            const skipEl = document.getElementById('cutscene-skip');
+            overlay.classList.remove('hidden');
+            textEl.textContent = poi.description;
+            textEl.classList.add('visible');
+            skipEl.textContent = 'Press E to continue';
+            this._showingPOI = true;
+          }
         }
       }
-
-      // Check proximity
-      const dx = shipPos.x - poi.x;
-      const dz = shipPos.z - poi.z;
-      const dist = Math.sqrt(dx * dx + dz * dz);
-      if (dist < 25) {
-        nearPOI = true;
-        this.hud.showInteraction(`Press E: ${poi.label}`);
-        if (this.input.justPressed('KeyE')) {
-          // Show the description using cutscene overlay
-          const overlay = document.getElementById('cutscene-overlay');
-          const textEl = document.getElementById('cutscene-text');
-          const skipEl = document.getElementById('cutscene-skip');
-          overlay.classList.remove('hidden');
-          textEl.textContent = poi.description;
-          textEl.classList.add('visible');
-          skipEl.textContent = 'Press E to continue';
-          this._showingPOI = true;
-        }
-      }
-    }
-
-    // Dismiss POI dialogue
-    if (this._showingPOI && this.input.justPressed('KeyE')) {
-      const overlay = document.getElementById('cutscene-overlay');
-      const textEl = document.getElementById('cutscene-text');
-      overlay.classList.add('hidden');
-      textEl.classList.remove('visible');
-      this._showingPOI = false;
     }
 
     // ── Island proximity — disembark prompt ──
@@ -565,6 +593,8 @@ export class SailingScene extends GameScene {
             islandWorldZ: nearest.entry.worldZ,
             shipPosition: shipPos.clone(),
             shipHeading: this.ship.heading,
+            questStage: this.currentQuestStage,
+            questLabel: nearest.entry.data.label || '',
           });
         }
       } else {

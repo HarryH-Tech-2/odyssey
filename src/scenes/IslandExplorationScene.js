@@ -23,12 +23,14 @@ export class IslandExplorationScene extends GameScene {
     this.camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 2000);
     this.time = 0;
 
+    this.island = data.island;
+
     this.returnData = {
       shipPosition: data.shipPosition,
       shipHeading: data.shipHeading,
+      questStage: data.questStage,
+      questLabel: this.island.label || '',
     };
-
-    this.island = data.island;
     this.islandWorldX = data.islandWorldX;
     this.islandWorldZ = data.islandWorldZ;
 
@@ -175,27 +177,35 @@ export class IslandExplorationScene extends GameScene {
     // ── Winding path from beach to center ──
     // Path is a series of flat boxes with glowing material
     const pathMat = new THREE.MeshStandardMaterial({
-      color: 0xf0e0c0,
-      emissive: 0xffd080,
-      emissiveIntensity: 0.15,
-      roughness: 0.9,
+      color: 0xf5e8c8,
+      emissive: 0xffcc66,
+      emissiveIntensity: 0.5,
+      roughness: 0.75,
     });
     const pathPoints = this._generateWindingPath(r);
     for (let i = 0; i < pathPoints.length; i++) {
       const p = pathPoints[i];
       const y = this.island.sampleHeight(p.x, p.z);
       if (y < 0.2) continue;
+      // Main path segment — wider
       const pathSeg = new THREE.Mesh(
-        new THREE.BoxGeometry(2.5, 0.05, 2.5),
+        new THREE.BoxGeometry(3.5, 0.06, 3.5),
         pathMat
       );
-      pathSeg.position.set(p.x, y + 0.05, p.z);
+      pathSeg.position.set(p.x, y + 0.06, p.z);
       pathSeg.rotation.y = Math.atan2(
         (pathPoints[Math.min(i + 1, pathPoints.length - 1)].x - p.x),
         (pathPoints[Math.min(i + 1, pathPoints.length - 1)].z - p.z)
       );
       pathSeg.receiveShadow = true;
       this.scene.add(pathSeg);
+
+      // Add a soft glow light every few segments
+      if (i % 4 === 0) {
+        const pathLight = new THREE.PointLight(0xffdd88, 0.8, 8);
+        pathLight.position.set(p.x, y + 1, p.z);
+        this.scene.add(pathLight);
+      }
     }
 
     // ── Bioluminescent plants along the path ──
@@ -439,7 +449,7 @@ export class IslandExplorationScene extends GameScene {
 
   _generateWindingPath(radius) {
     const points = [];
-    const steps = 25;
+    const steps = 50;
     // Path from edge (where player spawns) winding to center
     for (let i = 0; i < steps; i++) {
       const t = i / (steps - 1);
@@ -735,8 +745,14 @@ export class IslandExplorationScene extends GameScene {
 
           // Clamp to island radius
           const distFromCenter = Math.sqrt(this.playerPos.x ** 2 + this.playerPos.z ** 2);
-          if (distFromCenter > this.island.radius * 0.95) {
-            const scale = (this.island.radius * 0.95) / distFromCenter;
+          // Allow player to go further toward shore when near the ship
+          const distToShipXZ = Math.sqrt(
+            (this.playerPos.x - this.shipLocalPos.x) ** 2 +
+            (this.playerPos.z - this.shipLocalPos.z) ** 2
+          );
+          const maxRadius = distToShipXZ < 20 ? this.island.radius * 1.1 : this.island.radius * 0.95;
+          if (distFromCenter > maxRadius) {
+            const scale = maxRadius / distFromCenter;
             this.playerPos.x *= scale;
             this.playerPos.z *= scale;
           }
@@ -882,7 +898,7 @@ export class IslandExplorationScene extends GameScene {
 
     // ── Re-board ship check ──
     const distToShip = this.playerPos.distanceTo(this.shipLocalPos);
-    if (distToShip < 12 && !this.activeInteraction) {
+    if (distToShip < 18 && !this.activeInteraction) {
       this.hud.showInteraction('Press E to board ship');
       if (this.input.justPressed('KeyE')) {
         this.sceneManager.switchTo('sailing', this.returnData);
@@ -915,17 +931,17 @@ export class IslandExplorationScene extends GameScene {
     if (closestPoint) {
       this.activeInteraction = closestPoint;
       const distToShip = this.playerPos.distanceTo(this.shipLocalPos);
-      if (distToShip >= 12) {
+      if (distToShip >= 18) {
         this.hud.showInteraction(`Press E to examine: ${closestPoint.label}`);
       }
-      if (this.input.justPressed('KeyE') && distToShip >= 12) {
+      if (this.input.justPressed('KeyE') && distToShip >= 18) {
         this._showDialogue(closestPoint.description);
         this.showingDialogue = true;
       }
     } else {
       this.activeInteraction = null;
       const distToShip = this.playerPos.distanceTo(this.shipLocalPos);
-      if (distToShip >= 12) {
+      if (distToShip >= 18) {
         this.hud.hideInteraction();
       }
     }
