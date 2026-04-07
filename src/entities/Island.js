@@ -185,6 +185,7 @@ export class Island {
       hasMagic = false,
       hasVegetation = true,
       label = '',
+      flatness = 0,
     } = options;
 
     this.group = new THREE.Group();
@@ -192,6 +193,7 @@ export class Island {
     this.height = height;
     this.seed = seed;
     this.label = label;
+    this.flatness = flatness;
     this.rng = new SeededRandom(seed);
 
     this._generateTerrain(radius, height, sunPosition);
@@ -324,6 +326,11 @@ export class Island {
     const micro = fbm(nx * 6, nz * 6, 2, 2.0, 0.3) * 0.08; // fine micro detail
 
     let elevation = (baseNoise * 0.55 + ridges * 0.3 + detail + micro) * edgeFalloff;
+
+    // Apply flatness — reduce elevation variation, keep beach/shore shape
+    if (this.flatness > 0) {
+      elevation = elevation * (1 - this.flatness * 0.7);
+    }
 
     if (elevation > 0.3 && elevation < 0.5) {
       elevation = 0.3 + (elevation - 0.3) * 0.3;

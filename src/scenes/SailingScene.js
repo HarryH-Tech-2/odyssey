@@ -92,6 +92,7 @@ export class SailingScene extends GameScene {
           radius: 70, height: 40, seed: 1001, type: 'large',
           hasRuins: true, hasMagic: true, hasVegetation: true,
           label: 'Land of the Lotus Eaters',
+          flatness: 0.6,
           offsetX: 200, offsetZ: 100,
         },
       },
@@ -149,6 +150,75 @@ export class SailingScene extends GameScene {
     fisher.ship.group.position.set(160, 0, -260);
     fisher.addTo(this.scene);
     this.npcShips.push(fisher);
+
+    // ── Ocean Points of Interest — floating educational markers ──
+    this.oceanPOIs = [];
+    const poiData = [
+      {
+        x: 80, z: -150,
+        label: 'Floating Wreckage',
+        description: 'Drifting timber from a merchant vessel. Greek triremes like yours were the warships of the ancient world — 170 oarsmen in three tiers powered these ships to ramming speed. The bronze ram at your bow could punch through an enemy hull.',
+      },
+      {
+        x: -60, z: -200,
+        label: 'Dolphins',
+        description: 'A pod of dolphins leaps alongside your ship. The Greeks considered dolphins sacred to Apollo and Poseidon. Killing a dolphin was punishable by death in Athens. Sailors saw them as good omens — guides sent by the gods.',
+      },
+      {
+        x: 150, z: -100,
+        label: 'Merchant Vessel',
+        description: 'A trading ship passes in the distance. Greek merchants carried olive oil, wine, and pottery across the Mediterranean. The ancient economy ran on sea trade — Athens imported most of its grain from the Black Sea colonies.',
+      },
+      {
+        x: -30, z: -350,
+        label: 'Floating Amphora',
+        description: 'An amphora bobs in the waves, likely lost from a cargo ship. These clay jars were the shipping containers of the ancient world. Archaeologists can trace trade routes by mapping amphora finds across the Mediterranean seabed.',
+      },
+      {
+        x: 200, z: -250,
+        label: 'Sea Birds Circling',
+        description: 'Birds circle overhead — a sign of land nearby. Greek sailors navigated without compasses, using stars, wind patterns, and wildlife. Experienced helmsmen could read wave patterns reflected off distant islands.',
+      },
+      {
+        x: -100, z: -120,
+        label: 'Strange Current',
+        description: 'The water swirls with an unusual current. The Greeks knew the Mediterranean\'s currents well. Odysseus\'s wanderings may reflect real sailing challenges — the Strait of Messina\'s whirlpool inspired Charybdis, and its rocky shores became Scylla.',
+      },
+      {
+        x: 50, z: -450,
+        label: 'Distant Smoke',
+        description: 'Smoke rises from beyond the horizon. Fire signals were used across the Greek world for long-distance communication. According to Aeschylus, the fall of Troy was announced to Mycenae through a chain of signal fires stretching across the Aegean.',
+      },
+      {
+        x: -150, z: -300,
+        label: 'Offering to Poseidon',
+        description: 'You pass a spot where the sea seems to glow. Sailors would pour wine into the sea as a libation to Poseidon before voyages. Prayer and sacrifice were as essential to Greek sailing as wind and oars.',
+      },
+    ];
+
+    for (const poi of poiData) {
+      // Create a simple floating marker — a golden sphere bobbing on the water
+      const markerGeo = new THREE.SphereGeometry(1.5, 12, 8);
+      const markerMat = new THREE.MeshStandardMaterial({
+        color: 0xffd700,
+        emissive: 0xffa500,
+        emissiveIntensity: 0.3,
+        roughness: 0.4,
+        metalness: 0.3,
+        transparent: true,
+        opacity: 0.7,
+      });
+      const marker = new THREE.Mesh(markerGeo, markerMat);
+      marker.position.set(poi.x, 2, poi.z);
+      this.scene.add(marker);
+
+      // Add a point light so it glows
+      const light = new THREE.PointLight(0xffd700, 2, 30);
+      light.position.set(poi.x, 3, poi.z);
+      this.scene.add(light);
+
+      this.oceanPOIs.push({ marker, light, ...poi });
+    }
 
     // ── Particles ──
     this.birds = new SeabirdFlock(15);
@@ -281,22 +351,61 @@ export class SailingScene extends GameScene {
 
     this.sailingHUD.update(this.windAngle, this.sailTrim, this.crewCount);
 
-    // ── Island proximity — disembark prompt ──
-    const nearest = this.islandManager.getNearestIsland(shipPos.x, shipPos.z);
-    if (nearest && nearest.shoreDistance < 20) {
-      this.hud.showInteraction('Press E to disembark');
-      if (this.input.justPressed('KeyE')) {
-        this.sceneManager.switchTo('islandExploration', {
-          island: nearest.entry.island,
-          islandData: nearest.entry.data,
-          islandWorldX: nearest.entry.worldX,
-          islandWorldZ: nearest.entry.worldZ,
-          shipPosition: shipPos.clone(),
-          shipHeading: this.ship.heading,
-        });
+    // ── Ocean POI proximity + animation ──
+    let nearPOI = false;
+    for (const poi of this.oceanPOIs) {
+      // Bob animation
+      poi.marker.position.y = 1.5 + Math.sin(this.time * 2 + poi.x) * 0.5;
+      poi.marker.rotation.y = this.time * 0.5;
+
+      // Check proximity
+      const dx = shipPos.x - poi.x;
+      const dz = shipPos.z - poi.z;
+      const dist = Math.sqrt(dx * dx + dz * dz);
+      if (dist < 25) {
+        nearPOI = true;
+        this.hud.showInteraction(`Press E: ${poi.label}`);
+        if (this.input.justPressed('KeyE')) {
+          // Show the description using cutscene overlay
+          const overlay = document.getElementById('cutscene-overlay');
+          const textEl = document.getElementById('cutscene-text');
+          const skipEl = document.getElementById('cutscene-skip');
+          overlay.classList.remove('hidden');
+          textEl.textContent = poi.description;
+          textEl.classList.add('visible');
+          skipEl.textContent = 'Press E to continue';
+          this._showingPOI = true;
+        }
       }
-    } else {
-      this.hud.hideInteraction();
+    }
+
+    // Dismiss POI dialogue
+    if (this._showingPOI && this.input.justPressed('KeyE')) {
+      const overlay = document.getElementById('cutscene-overlay');
+      const textEl = document.getElementById('cutscene-text');
+      overlay.classList.add('hidden');
+      textEl.classList.remove('visible');
+      this._showingPOI = false;
+    }
+
+    // ── Island proximity — disembark prompt ──
+    if (!nearPOI && !this._showingPOI) {
+      const nearest = this.islandManager.getNearestIsland(shipPos.x, shipPos.z);
+      if (nearest && nearest.shoreDistance < 20) {
+        this.hud.showInteraction('Press E to disembark');
+        if (this.input.justPressed('KeyE')) {
+          this.sceneManager.switchTo('islandExploration', {
+            island: nearest.entry.island,
+            islandData: nearest.entry.data,
+            islandWorldX: nearest.entry.worldX,
+            islandWorldZ: nearest.entry.worldZ,
+            shipPosition: shipPos.clone(),
+            shipHeading: this.ship.heading,
+          });
+        }
+      } else {
+        this.hud.hideInteraction();
+      }
     }
   }
 
