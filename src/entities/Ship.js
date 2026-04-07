@@ -21,12 +21,12 @@ function makePalette(sunPosition) {
     ShaderLib.createPBRMaterial({ color, roughness, metallic, sunPosition });
 
   return {
-    hullDark:    m(0x3E2210, 0.82, 0.04),   // dark lower hull
-    hullMid:     m(0x5C3A1E, 0.80, 0.05),   // main hull planks
-    hullLight:   m(0x7A5230, 0.78, 0.06),   // upper hull
-    deck:        m(0x9B8060, 0.90, 0.00),   // deck planks
-    deckLine:    m(0x7B6040, 0.92, 0.00),   // plank gaps
-    accentRed:   m(0x8B1A1A, 0.70, 0.10),   // painted stripe
+    hullDark:    m(0x6B3A2A, 0.82, 0.04),   // dark lower hull
+    hullMid:     m(0x8B5E3C, 0.80, 0.05),   // main hull planks
+    hullLight:   m(0x9A6B42, 0.78, 0.06),   // upper hull
+    deck:        m(0xC4A872, 0.90, 0.00),   // deck planks
+    deckLine:    m(0xA08050, 0.92, 0.00),   // plank gaps
+    accentRed:   m(0xCC2222, 0.70, 0.10),   // painted stripe
     accentGold:  m(0xB8860B, 0.35, 0.60),   // gold trim / ornaments
     accentBlue:  m(0x1A3A6A, 0.65, 0.15),   // Greek blue accents
     bronze:      m(0x8B7D3C, 0.40, 0.70),   // ram, fittings
@@ -285,7 +285,7 @@ export class Ship {
   _buildSail() {
     const sailGeo = new THREE.PlaneGeometry(7.5, 7, 20, 20);
     this.sailMaterial = ShaderLib.createSailMaterial(this.sunPosition);
-    this.sailMaterial.uniforms.uColor.value.set(0x2A1A0A); // Dark sail
+    this.sailMaterial.uniforms.uColor.value.set(0xF5E6C8); // Light sail
 
     this.sail = new THREE.Mesh(sailGeo, this.sailMaterial);
     this.sail.position.set(1.0, 11.8, 0);

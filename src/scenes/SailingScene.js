@@ -61,22 +61,25 @@ export class SailingScene extends GameScene {
     this.odysseus = new Character({
       sunPosition: this.sunPosition,
       scale: 0.8,
+      armorColor: 0xB8860B,
+      capeColor: 0xCC0000,
     });
     this.odysseus.setPosition(-5, 3.8, 0);
-    this.ship.group.add(this.odysseus.group);
+    this.ship.meshGroup.add(this.odysseus.group);
 
     this.crew = [];
+    const crewColors = [0x8B6914, 0x6B8E23, 0x8B4513, 0x8B6914, 0x6B8E23, 0x8B4513];
     for (let i = 0; i < 6; i++) {
       const c = new Character({
         sunPosition: this.sunPosition,
-        armorColor: 0x7a6a5a,
+        armorColor: crewColors[i],
         hasHelmet: false,
         hasCape: false,
         hasSword: false,
         scale: 0.65,
       });
       c.setPosition(-3 + i * 1.3, 3.1, (i % 2 === 0 ? 0.5 : -0.5));
-      this.ship.group.add(c.group);
+      this.ship.meshGroup.add(c.group);
       this.crew.push(c);
     }
 
