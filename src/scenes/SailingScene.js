@@ -114,6 +114,15 @@ export class SailingScene extends GameScene {
           offsetX: 300, offsetZ: 150,
         },
       },
+      {
+        cellX: 0, cellZ: -3,
+        options: {
+          radius: 65, height: 30, seed: 4004, type: 'large',
+          hasRuins: true, hasMagic: true, hasVegetation: true,
+          label: 'Aeaea - Island of Circe',
+          offsetX: 200, offsetZ: 200,
+        },
+      },
     ];
 
     this.islandManager = new IslandManager(this.scene, this.sunPosition, 42, storyIslands);
@@ -402,6 +411,7 @@ export class SailingScene extends GameScene {
       { objective: 'Sail to the Land of the Lotus Eaters', target: { x: 200, z: -300 }, label: 'Land of the Lotus Eaters' },
       { objective: 'Sail to the Island of the Cyclops', target: { x: -250, z: -600 }, label: 'Cyclops Island' },
       { objective: 'Seek Aeolus, Keeper of the Winds', target: { x: 700, z: -650 }, label: 'Aeolus' },
+      { objective: 'Find the sorceress Circe on Aeaea', target: { x: 200, z: -1000 }, label: 'Aeaea - Island of Circe' },
     ];
 
     // Restore quest stage if returning from island, otherwise start from saved or 0

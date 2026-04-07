@@ -149,6 +149,14 @@ export class IslandExplorationScene extends GameScene {
       this._buildLotusEatersWorld(sunPosition);
     }
 
+    if (this.island.label === 'Cyclops Island') {
+      this._buildCyclopsWorld(sunPosition);
+    }
+
+    if (this.island.label === 'Aeaea - Island of Circe') {
+      this._buildCirceWorld(sunPosition);
+    }
+
     this.input.reset();
     this.input.enablePointerLock();
   }
@@ -447,6 +455,108 @@ export class IslandExplorationScene extends GameScene {
     }
   }
 
+  _buildCirceWorld(sunPosition) {
+    const r = this.island.radius;
+
+    // ── Enchanted forest atmosphere ──
+    this.scene.fog = new THREE.FogExp2(0xc8b0d8, 0.0025); // purple-tinted mist
+
+    // Magical purple ambient
+    this.scene.add(new THREE.AmbientLight(0xb090c0, 0.5));
+    this.scene.add(new THREE.HemisphereLight(0xd0a0e0, 0x5a7a3a, 0.4));
+
+    // Warm golden light from Circe's palace
+    const palaceLight = new THREE.PointLight(0xffa840, 4, r * 0.5);
+    palaceLight.position.set(0, this.island.sampleHeight(0, 0) + 5, 0);
+    this.scene.add(palaceLight);
+
+    // ── Circe's Palace — stone structure at island center ──
+    const stoneMat = new THREE.MeshStandardMaterial({ color: 0xd0c8b8, roughness: 0.8, metalness: 0.05 });
+    const darkStoneMat = new THREE.MeshStandardMaterial({ color: 0xa09888, roughness: 0.85 });
+    const purpleMat = new THREE.MeshStandardMaterial({ color: 0x8060a0, roughness: 0.6, emissive: 0x402060, emissiveIntensity: 0.15 });
+
+    const cy = this.island.sampleHeight(0, 0);
+
+    // Palace base platform
+    const platform = new THREE.Mesh(new THREE.CylinderGeometry(5, 6, 0.6, 12), stoneMat);
+    platform.position.set(0, cy + 0.3, 0);
+    platform.receiveShadow = true;
+    this.scene.add(platform);
+
+    // Palace columns in a circle
+    for (let i = 0; i < 8; i++) {
+      const angle = (i / 8) * Math.PI * 2;
+      const col = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.25, 0.3, 5, 8),
+        stoneMat
+      );
+      col.position.set(Math.cos(angle) * 4.5, cy + 3, Math.sin(angle) * 4.5);
+      col.castShadow = true;
+      this.scene.add(col);
+    }
+
+    // Palace roof — flat disc
+    const roof = new THREE.Mesh(new THREE.CylinderGeometry(5.5, 5, 0.4, 12), darkStoneMat);
+    roof.position.set(0, cy + 5.5, 0);
+    this.scene.add(roof);
+
+    // Purple magical glow around palace
+    const glowDisc = new THREE.Mesh(
+      new THREE.CircleGeometry(7, 24),
+      new THREE.MeshBasicMaterial({ color: 0x8844cc, transparent: true, opacity: 0.08, depthWrite: false })
+    );
+    glowDisc.rotation.x = -Math.PI / 2;
+    glowDisc.position.set(0, cy + 0.1, 0);
+    this.scene.add(glowDisc);
+
+    // ── Magical floating particles (purple/gold) ──
+    const sparkleCount = 120;
+    const sparkleGeo = new THREE.BufferGeometry();
+    const sparklePos = new Float32Array(sparkleCount * 3);
+    this._circleSparkleData = [];
+    for (let i = 0; i < sparkleCount; i++) {
+      const sx = (Math.random() - 0.5) * r * 0.6;
+      const sz = (Math.random() - 0.5) * r * 0.6;
+      const sy = this.island.sampleHeight(sx, sz) + 1 + Math.random() * 5;
+      sparklePos[i * 3] = sx;
+      sparklePos[i * 3 + 1] = Math.max(sy, 1);
+      sparklePos[i * 3 + 2] = sz;
+      this._circleSparkleData.push({ x: sx, y: Math.max(sy, 1), z: sz, phase: Math.random() * Math.PI * 2 });
+    }
+    sparkleGeo.setAttribute('position', new THREE.BufferAttribute(sparklePos, 3));
+    const sparkleMat = new THREE.PointsMaterial({
+      color: 0xcc88ff,
+      size: 0.2,
+      transparent: true,
+      opacity: 0.5,
+      depthWrite: false,
+      sizeAttenuation: true,
+    });
+    this._circeParticles = new THREE.Points(sparkleGeo, sparkleMat);
+    this.scene.add(this._circeParticles);
+
+    // ── Glowing herb patches along paths ──
+    const herbMat = new THREE.MeshStandardMaterial({
+      color: 0x66dd88,
+      emissive: 0x22aa44,
+      emissiveIntensity: 0.4,
+      transparent: true,
+      opacity: 0.85,
+    });
+    for (let i = 0; i < 20; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const dist = r * 0.1 + Math.random() * r * 0.35;
+      const hx = Math.cos(angle) * dist;
+      const hz = Math.sin(angle) * dist;
+      const hy = this.island.sampleHeight(hx, hz);
+      if (hy < 0.5) continue;
+      const herb = new THREE.Mesh(new THREE.SphereGeometry(0.3 + Math.random() * 0.2, 6, 4), herbMat);
+      herb.position.set(hx, hy + 0.2, hz);
+      herb.scale.y = 0.5;
+      this.scene.add(herb);
+    }
+  }
+
   _generateWindingPath(radius) {
     const points = [];
     const steps = 50;
@@ -535,6 +645,70 @@ export class IslandExplorationScene extends GameScene {
       keeper.setPosition(0, cy, 0);
       keeper.addTo(this.scene);
       this.npcs.push(keeper);
+    } else if (label === 'Aeaea - Island of Circe') {
+      // Circe — enchantress in flowing purple robes at her palace
+      const circe = new Character({
+        sunPosition,
+        skinColor: 0xE0C0A0,
+        armorColor: 0x7A3A8A,   // deep purple robes
+        helmetColor: 0xC8A030,
+        hasHelmet: false,
+        hasCape: true,
+        capeColor: 0x5A2A6A,
+        hasSword: false,
+        hasShield: false,
+        scale: 0.85,
+      });
+      const cy = this.island.sampleHeight(0, 0);
+      circe.setPosition(0, cy, 0);
+      circe.addTo(this.scene);
+      this.npcs.push(circe);
+
+      // Handmaidens — 3 attendants around Circe
+      for (let i = 0; i < 3; i++) {
+        const angle = (i / 3) * Math.PI * 2 + 0.5;
+        const hx = Math.cos(angle) * r * 0.06;
+        const hz = Math.sin(angle) * r * 0.06;
+        const hy = this.island.sampleHeight(hx, hz);
+        const maiden = new Character({
+          sunPosition,
+          skinColor: 0xD8B898,
+          armorColor: 0xA088B0,   // lighter purple
+          hasHelmet: false,
+          hasCape: false,
+          hasSword: false,
+          hasShield: false,
+          scale: 0.7,
+        });
+        maiden.setPosition(hx, hy, hz);
+        maiden.setRotation(angle + Math.PI);
+        maiden.addTo(this.scene);
+        this.npcs.push(maiden);
+      }
+
+      // Enchanted animals (transformed men) — scattered around the clearing
+      const animalPoses = [
+        { x: r * 0.1, z: r * 0.08 },
+        { x: -r * 0.12, z: r * 0.05 },
+        { x: r * 0.08, z: -r * 0.1 },
+        { x: -r * 0.06, z: -r * 0.12 },
+        { x: r * 0.15, z: -r * 0.02 },
+      ];
+      for (const ap of animalPoses) {
+        const ay = this.island.sampleHeight(ap.x, ap.z);
+        if (ay < 0.5) continue;
+        const pig = new Character({
+          sunPosition,
+          skinColor: 0xD8A088,   // pinkish
+          armorColor: 0xD8A088,
+          hasHelmet: false, hasCape: false, hasSword: false, hasShield: false,
+          scale: 0.25,
+        });
+        pig.setPosition(ap.x, ay, ap.z);
+        pig.setRotation(Math.random() * Math.PI * 2);
+        pig.addTo(this.scene);
+        this.npcs.push(pig);
+      }
     }
   }
 
@@ -675,6 +849,46 @@ export class IslandExplorationScene extends GameScene {
           x: -r * 0.3, z: r * 0.1, radius: 6,
           label: 'Leather Wind Bag',
           description: 'A massive leather bag, tightly bound with silver cord. The story of the wind bag teaches about trust and temptation. It also reflects how the ancient Greeks understood weather — not as random chance, but as the work of gods who could be bargained with.',
+        },
+      ];
+    }
+
+    if (label === 'Aeaea - Island of Circe') {
+      return [
+        {
+          x: 0, z: 0, radius: 7,
+          label: 'Circe, the Enchantress',
+          description: '"Welcome, bold Odysseus. I have been expecting you." Circe was a powerful sorceress, daughter of the sun god Helios. She turned Odysseus\'s men into pigs with enchanted food and wine. Only Odysseus, protected by the herb moly given by Hermes, could resist her magic.',
+        },
+        {
+          x: r * 0.1, z: r * 0.08, radius: 5,
+          label: 'Enchanted Pig',
+          description: 'This creature was once one of your crewmen. Circe\'s magic transformed them into swine, though they kept their human minds — aware of their fate but unable to speak. The myth reflects Greek fears about losing one\'s humanity to temptation and excess.',
+        },
+        {
+          x: -r * 0.15, z: r * 0.12, radius: 6,
+          label: 'Circe\'s Loom',
+          description: 'A great loom stands in Circe\'s hall, weaving cloth of extraordinary beauty. In Greek mythology, weaving was both a domestic art and a symbol of power. Penelope wove and unwove a shroud for three years to delay her suitors — weaving as resistance.',
+        },
+        {
+          x: r * 0.2, z: -r * 0.1, radius: 6,
+          label: 'Herbal Garden',
+          description: 'Strange herbs and flowers grow in ordered rows. Circe was a master of pharmakeia — the art of drugs and potions. The word "pharmacy" comes from this Greek root. Ancient Greeks used hundreds of plant-based remedies, many of which modern science has validated.',
+        },
+        {
+          x: -r * 0.2, z: -r * 0.15, radius: 6,
+          label: 'The Herb Moly',
+          description: 'A small white flower with a black root — the legendary herb moly. Hermes gave this to Odysseus as protection against Circe\'s magic. Scholars have debated what real plant moly might represent — snowdrop (galanthus) is a leading candidate, as it contains galantamine, which blocks certain nerve agents.',
+        },
+        {
+          x: r * 0.25, z: r * 0.15, radius: 5,
+          label: 'Wine Mixing Bowl',
+          description: 'An ornate krater filled with wine. Circe mixed her potions into wine to enchant visitors. Wine was central to Greek social life — they always diluted it with water. Drinking undiluted wine was considered barbaric. The symposium, a ritualized drinking party, was where philosophy and poetry flourished.',
+        },
+        {
+          x: -r * 0.1, z: -r * 0.25, radius: 6,
+          label: 'Map to the Underworld',
+          description: 'Circe gave Odysseus instructions to visit the Underworld to consult the prophet Tiresias. She told him how to summon the dead with blood sacrifice. This journey to Hades — the "nekyia" — is one of the most haunting passages in all of ancient literature.',
         },
       ];
     }
@@ -891,6 +1105,19 @@ export class IslandExplorationScene extends GameScene {
         mist.position.z += Math.cos(this.time * 0.25 + i * 2) * dt * 0.15;
         mist.material.opacity = 0.06 + i * 0.02 + Math.sin(this.time + i) * 0.01;
       }
+    }
+
+    // ── Circe world animation ──
+    if (this._circeParticles) {
+      const pos = this._circeParticles.geometry.attributes.position;
+      for (let i = 0; i < this._circleSparkleData.length; i++) {
+        const p = this._circleSparkleData[i];
+        p.x += Math.sin(this.time * 0.6 + p.phase) * dt * 0.4;
+        p.y += Math.sin(this.time * 0.9 + p.phase * 2) * dt * 0.3;
+        p.z += Math.cos(this.time * 0.5 + p.phase) * dt * 0.4;
+        pos.setXYZ(i, p.x, p.y, p.z);
+      }
+      pos.needsUpdate = true;
     }
 
     // ── Interaction checks ──
