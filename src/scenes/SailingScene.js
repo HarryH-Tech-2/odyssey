@@ -89,7 +89,7 @@ export class SailingScene extends GameScene {
       {
         cellX: 0, cellZ: -1,
         options: {
-          radius: 35, height: 20, seed: 1001, type: 'large',
+          radius: 70, height: 40, seed: 1001, type: 'large',
           hasRuins: true, hasMagic: true, hasVegetation: true,
           label: 'Land of the Lotus Eaters',
           offsetX: 200, offsetZ: 100,
@@ -98,7 +98,7 @@ export class SailingScene extends GameScene {
       {
         cellX: -1, cellZ: -2,
         options: {
-          radius: 50, height: 35, seed: 2002, type: 'large',
+          radius: 100, height: 70, seed: 2002, type: 'large',
           hasRuins: false, hasMagic: false, hasVegetation: true,
           label: 'Cyclops Island',
           offsetX: 150, offsetZ: 200,
@@ -107,7 +107,7 @@ export class SailingScene extends GameScene {
       {
         cellX: 1, cellZ: -2,
         options: {
-          radius: 25, height: 18, seed: 3003, type: 'medium',
+          radius: 50, height: 36, seed: 3003, type: 'medium',
           hasRuins: true, hasMagic: true, hasVegetation: true,
           label: 'Aeolus',
           offsetX: 300, offsetZ: 150,

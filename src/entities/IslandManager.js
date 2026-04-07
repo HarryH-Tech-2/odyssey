@@ -105,16 +105,16 @@ export class IslandManager {
     let type, radius, height;
     if (sizeRoll < 0.3) {
       type = 'small';
-      radius = rng.range(8, 18);
-      height = rng.range(5, 10);
+      radius = rng.range(16, 36);
+      height = rng.range(10, 20);
     } else if (sizeRoll < 0.75) {
       type = 'medium';
-      radius = rng.range(20, 35);
-      height = rng.range(10, 20);
+      radius = rng.range(40, 70);
+      height = rng.range(20, 40);
     } else {
       type = 'large';
-      radius = rng.range(35, 55);
-      height = rng.range(18, 30);
+      radius = rng.range(70, 110);
+      height = rng.range(36, 60);
     }
 
     const hasRuins = rng.next() < 0.3;
