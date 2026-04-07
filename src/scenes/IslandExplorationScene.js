@@ -122,6 +122,10 @@ export class IslandExplorationScene extends GameScene {
     this.cameraAzimuth = this.playerHeading + Math.PI;
     this.cameraElevation = 0.3;
 
+    // ── NPCs ──
+    this.npcs = [];
+    this._spawnNPCs(sunPosition);
+
     // ── Interaction system ──
     this.interactionPoints = this._gatherInteractionPoints();
     this.activeInteraction = null;
@@ -138,41 +142,241 @@ export class IslandExplorationScene extends GameScene {
     this.input.enablePointerLock();
   }
 
+  _spawnNPCs(sunPosition) {
+    const label = this.island.label || '';
+    const r = this.island.radius;
+
+    if (label === 'Land of the Lotus Eaters') {
+      // Lotus Eaters — dreamy, swaying figures in loose robes
+      const lotusPoses = [
+        { x: r * 0.15, z: r * 0.1, rot: 0.5 },
+        { x: -r * 0.1, z: r * 0.2, rot: -0.3 },
+        { x: r * 0.25, z: -r * 0.05, rot: 1.2 },
+        { x: -r * 0.2, z: -r * 0.15, rot: 2.1 },
+        { x: r * 0.05, z: -r * 0.25, rot: -1.0 },
+        { x: -r * 0.3, z: r * 0.05, rot: 0.8 },
+      ];
+      for (const pose of lotusPoses) {
+        const npc = new Character({
+          sunPosition,
+          skinColor: 0xCBA882,
+          armorColor: 0xD4C4A8,   // pale robes
+          hasHelmet: false,
+          hasCape: false,
+          hasSword: false,
+          hasShield: false,
+          scale: 0.75,
+        });
+        const y = this.island.sampleHeight(pose.x, pose.z);
+        if (y > 0.5) {
+          npc.setPosition(pose.x, y, pose.z);
+          npc.setRotation(pose.rot);
+          npc.addTo(this.scene);
+          this.npcs.push(npc);
+        }
+      }
+    } else if (label === 'Cyclops Island') {
+      // Wild goats (simplified as small characters without gear)
+      for (let i = 0; i < 4; i++) {
+        const angle = (i / 4) * Math.PI * 2 + 0.5;
+        const dist = r * 0.3;
+        const x = Math.cos(angle) * dist;
+        const z = Math.sin(angle) * dist;
+        const y = this.island.sampleHeight(x, z);
+        if (y > 1) {
+          const goat = new Character({
+            sunPosition,
+            skinColor: 0xA09080,
+            armorColor: 0xA09080,
+            hasHelmet: false, hasCape: false, hasSword: false, hasShield: false,
+            scale: 0.3,
+          });
+          goat.setPosition(x, y, z);
+          goat.setRotation(angle);
+          goat.addTo(this.scene);
+          this.npcs.push(goat);
+        }
+      }
+    } else if (label === 'Aeolus') {
+      // Wind keeper — regal figure at island center
+      const keeper = new Character({
+        sunPosition,
+        skinColor: 0xD4B090,
+        armorColor: 0x4A6A9A,   // royal blue robes
+        helmetColor: 0xC8A030,
+        hasHelmet: false,
+        hasCape: true,
+        capeColor: 0x2A4A7A,
+        hasSword: false,
+        hasShield: false,
+        scale: 0.9,
+      });
+      const cy = this.island.sampleHeight(0, 0);
+      keeper.setPosition(0, cy, 0);
+      keeper.addTo(this.scene);
+      this.npcs.push(keeper);
+    }
+  }
+
   _gatherInteractionPoints() {
     const points = [];
     const island = this.island;
+    const label = island.label || '';
+    const r = island.radius;
 
-    if (island.label) {
+    // ── Island-specific content ──
+    const islandContent = this._getIslandContent(label, r);
+    for (const pt of islandContent) {
+      const y = island.sampleHeight(pt.x, pt.z);
+      if (y > 0.3) {
+        points.push({ ...pt, y, radius: pt.radius || 6 });
+      }
+    }
+
+    // Magic shrine
+    if (island.magicOrb) {
+      const pos = island.magicOrb.position;
+      points.push({
+        x: pos.x, z: pos.z, y: pos.y,
+        radius: 5,
+        label: 'Ancient Shrine',
+        description: 'A golden light pulses from an ancient shrine. The Greeks believed divine power could dwell in sacred places — a temenos, or sacred precinct, marked by offerings and prayer.',
+      });
+    }
+
+    // General ancient Greece educational points for any island with ruins
+    if (island.group && !label) {
       points.push({
         x: 0, z: 0,
         y: island.sampleHeight(0, 0),
         radius: 8,
-        label: island.label,
-        description: this._getIslandDescription(island.label),
-      });
-    }
-
-    if (island.magicOrb) {
-      const pos = island.magicOrb.position;
-      points.push({
-        x: pos.x, z: pos.z,
-        y: pos.y,
-        radius: 5,
-        label: 'Ancient Shrine',
-        description: 'A golden light pulses from an ancient shrine. Divine power lingers here — perhaps a gift from the gods.',
+        label: 'Ruins',
+        description: 'Crumbling columns of a Greek temple. The ancient Greeks built temples not as gathering places for worship, but as houses for their gods. Worshippers prayed outside, at an altar before the entrance.',
       });
     }
 
     return points;
   }
 
-  _getIslandDescription(label) {
-    const descriptions = {
-      'Land of the Lotus Eaters': 'The air is thick with a sweet, intoxicating fragrance. Strange flowers bloom everywhere. The locals seem lost in a blissful haze...',
-      'Cyclops Island': 'A wild, untamed island. Massive footprints mark the earth. Somewhere in the hills, you hear a deep rumbling voice...',
-      'Aeolus': 'The wind swirls in impossible patterns around this island. At its heart, a palace gleams — the home of the Keeper of Winds.',
-    };
-    return descriptions[label] || 'An uncharted island. Who knows what awaits here?';
+  _getIslandContent(label, r) {
+    if (label === 'Land of the Lotus Eaters') {
+      return [
+        {
+          x: r * 0.15, z: r * 0.1, radius: 5,
+          label: 'A Lotus Eater',
+          description: '"Try the lotus," the figure murmurs dreamily. "You will forget all your sorrows..." In Homer\'s Odyssey, the Lotus Eaters offered Odysseus\'s crew a magical fruit that made them forget their homeland. Odysseus had to drag his men back to the ships by force.',
+        },
+        {
+          x: -r * 0.1, z: r * 0.2, radius: 5,
+          label: 'A Drowsy Lotus Eater',
+          description: '"Why would you want to leave? There is nothing but pain out there..." The story of the Lotus Eaters is one of the first trials in the Odyssey. It warns about the danger of complacency — choosing comfortable forgetfulness over the difficult journey home.',
+        },
+        {
+          x: r * 0.25, z: -r * 0.05, radius: 5,
+          label: 'Lotus Flowers',
+          description: 'Strange, luminous flowers grow everywhere. The lotus has deep meaning in Greek culture. The Greeks associated it with forgetfulness and escape. Herodotus wrote that real lotus fruit existed in Libya — likely the jujube or date palm — and was used to make a sweet wine.',
+        },
+        {
+          x: -r * 0.3, z: r * 0.05, radius: 6,
+          label: 'A Singing Lotus Eater',
+          description: 'A soft, haunting melody drifts through the air. Music was central to Greek life — the word "music" comes from the Muses, nine goddesses of artistic inspiration. The Greeks believed music could heal, educate, and even influence the gods.',
+        },
+        {
+          x: 0, z: -r * 0.25, radius: 7,
+          label: 'Stone Tablet',
+          description: 'A weathered stone tablet reads: "Know thyself" — one of the Delphic maxims inscribed at the Temple of Apollo at Delphi. The Greeks valued self-knowledge above all. Socrates taught that "the unexamined life is not worth living."',
+        },
+        {
+          x: r * 0.35, z: r * 0.2, radius: 6,
+          label: 'Olive Grove',
+          description: 'Ancient olive trees twist in the warm breeze. The olive was sacred to Athena — legend says she won patronage of Athens by giving the city its first olive tree. Olive oil was used for cooking, lighting, medicine, and as a prize for Olympic victors.',
+        },
+        {
+          x: -r * 0.15, z: -r * 0.3, radius: 6,
+          label: 'Broken Amphora',
+          description: 'Shards of a painted amphora lie scattered here. Greek pottery told stories — red figures on black backgrounds, or black figures on red. Amphorae carried wine, olive oil, and grain across the Mediterranean, fueling the trade networks that connected the Greek world.',
+        },
+      ];
+    }
+
+    if (label === 'Cyclops Island') {
+      return [
+        {
+          x: 0, z: 0, radius: 8,
+          label: 'Massive Footprint',
+          description: 'An enormous footprint, three times the size of a man\'s. In the Odyssey, the Cyclops Polyphemus was a one-eyed giant, son of Poseidon. When Odysseus blinded him to escape, Polyphemus cursed Odysseus — and Poseidon\'s wrath followed him across the sea.',
+        },
+        {
+          x: r * 0.2, z: -r * 0.15, radius: 6,
+          label: 'Sheep Pen',
+          description: 'A crude stone enclosure for livestock. Polyphemus was a shepherd who kept flocks of sheep and goats. Odysseus and his men escaped the cave by clinging to the bellies of the giant\'s rams — one of the cleverest tricks in all of Greek mythology.',
+        },
+        {
+          x: -r * 0.25, z: -r * 0.1, radius: 6,
+          label: 'Cave Entrance',
+          description: 'A dark cave mouth gapes in the hillside. When Polyphemus asked Odysseus his name, the hero replied "Nobody." So when the blinded Cyclops cried for help, he shouted "Nobody is hurting me!" and no one came. The Greeks called this kind of cleverness "metis" — cunning intelligence.',
+        },
+        {
+          x: r * 0.3, z: r * 0.15, radius: 5,
+          label: 'Sharpened Stake',
+          description: 'A massive olive-wood stake, its tip hardened by fire. This is the weapon Odysseus used to blind Polyphemus. The olive tree appears again and again in the Odyssey — Odysseus\'s own marriage bed was carved from a living olive tree, a secret known only to him and Penelope.',
+        },
+        {
+          x: -r * 0.1, z: r * 0.3, radius: 6,
+          label: 'Coastal Rocks',
+          description: 'Huge boulders lie along the shore. As Odysseus sailed away, Polyphemus hurled rocks at his ships. Ancient Greeks explained natural rock formations through myths. The concept of "hubris" — excessive pride — is central here: Odysseus couldn\'t resist shouting his real name, which let Polyphemus curse him.',
+        },
+      ];
+    }
+
+    if (label === 'Aeolus') {
+      return [
+        {
+          x: 0, z: 0, radius: 7,
+          label: 'Aeolus, Keeper of Winds',
+          description: '"Welcome, Odysseus. I shall give you a gift — all the winds of the world, bound in a leather bag. Only the West Wind shall blow free, to carry you home." In the myth, Odysseus\'s crew opened the bag thinking it held treasure, and the released winds blew them back across the sea.',
+        },
+        {
+          x: r * 0.2, z: r * 0.15, radius: 6,
+          label: 'Wind Compass',
+          description: 'A stone circle with carvings of the four winds. The Greeks personified the winds: Boreas (North), Notos (South), Euros (East), and Zephyros (West). The Tower of the Winds in Athens, built around 50 BC, is one of the world\'s first meteorological stations.',
+        },
+        {
+          x: -r * 0.2, z: -r * 0.15, radius: 6,
+          label: 'Navigation Chart',
+          description: 'A carved stone map of sea routes. Greek sailors navigated by stars, winds, and landmarks. They rarely sailed out of sight of land. The Greeks mapped the Mediterranean, and Eratosthenes of Cyrene even calculated the Earth\'s circumference to remarkable accuracy around 240 BC.',
+        },
+        {
+          x: r * 0.1, z: -r * 0.25, radius: 5,
+          label: 'Bronze Astrolabe',
+          description: 'A gleaming bronze instrument for reading the stars. The Greeks developed early astronomical instruments. Hipparchus created the first star catalog, and the Antikythera mechanism — found in a shipwreck — is an ancient analog computer that predicted eclipses and tracked the Olympics.',
+        },
+        {
+          x: -r * 0.3, z: r * 0.1, radius: 6,
+          label: 'Leather Wind Bag',
+          description: 'A massive leather bag, tightly bound with silver cord. The story of the wind bag teaches about trust and temptation. It also reflects how the ancient Greeks understood weather — not as random chance, but as the work of gods who could be bargained with.',
+        },
+      ];
+    }
+
+    // Default content for unnamed islands
+    return [
+      {
+        x: 0, z: 0, radius: 8,
+        label: 'Ancient Ruins',
+        description: 'Crumbling columns of a Greek temple. The ancient Greeks built temples not as places of congregation, but as houses for their gods. The Parthenon held a massive gold-and-ivory statue of Athena, patron goddess of Athens.',
+      },
+      {
+        x: r * 0.2, z: r * 0.15, radius: 5,
+        label: 'Mosaic Fragment',
+        description: 'A fragment of a floor mosaic depicting Poseidon. In Greek mythology, Poseidon was god of the sea, earthquakes, and horses. Sailors made offerings to him before voyages. His trident could calm or stir the seas at will.',
+      },
+      {
+        x: -r * 0.25, z: -r * 0.1, radius: 5,
+        label: 'Carved Inscription',
+        description: '"Xenos" — the Greek word for both "stranger" and "guest." The concept of "xenia," or guest-friendship, was sacred in ancient Greece. Zeus himself was "Zeus Xenios," protector of guests. Violating xenia could bring divine punishment.',
+      },
+    ];
   }
 
   async exit() {
@@ -312,6 +516,11 @@ export class IslandExplorationScene extends GameScene {
     this.sky.update(dt, this.time);
     if (this.island.magicOrb) {
       this.island.update(this.time);
+    }
+
+    // ── NPC idle animation ──
+    for (const npc of this.npcs) {
+      npc.update(dt, this.time);
     }
 
     // ── Interaction checks ──

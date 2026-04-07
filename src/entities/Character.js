@@ -29,12 +29,12 @@ export class Character {
     this.isWalking = false;
 
     // ── Materials ──
-    const skin = ShaderLib.createPBRMaterial({ color: skinColor, roughness: 0.7, metallic: 0.0, sunPosition });
-    const tunic = ShaderLib.createPBRMaterial({ color: 0xC8B898, roughness: 0.85, metallic: 0.0, sunPosition }); // beige tunic
-    const leather = ShaderLib.createPBRMaterial({ color: 0x5C4033, roughness: 0.8, metallic: 0.05, sunPosition }); // brown leather
+    const skin = ShaderLib.createPBRMaterial({ color: skinColor, roughness: 0.65, metallic: 0.0, sunPosition });
+    const tunic = ShaderLib.createPBRMaterial({ color: 0xE8DCC4, roughness: 0.82, metallic: 0.0, sunPosition }); // sun-bleached linen
+    const leather = ShaderLib.createPBRMaterial({ color: 0x8B6B4A, roughness: 0.75, metallic: 0.05, sunPosition }); // warm tan leather
     const metal = ShaderLib.createPBRMaterial({ color: helmetColor, roughness: 0.3, metallic: 0.7, sunPosition });
-    const hair = ShaderLib.createPBRMaterial({ color: 0x2A1A0A, roughness: 0.9, metallic: 0.0, sunPosition }); // dark brown hair
-    const darkLeather = ShaderLib.createPBRMaterial({ color: 0x3B2510, roughness: 0.85, metallic: 0.02, sunPosition });
+    const hair = ShaderLib.createPBRMaterial({ color: 0x3A2A18, roughness: 0.85, metallic: 0.0, sunPosition }); // warm dark brown
+    const darkLeather = ShaderLib.createPBRMaterial({ color: 0x6B5035, roughness: 0.8, metallic: 0.02, sunPosition });
 
     // ── Torso — broad, athletic chest ──
     const torsoGeo = new THREE.BoxGeometry(0.85, 0.9, 0.5);
@@ -362,57 +362,68 @@ export class Character {
   update(dt, time) {
     this.animTime += dt;
 
-    if (this.isWalking) {
-      const walkSpeed = 6;
-      const t = this.animTime * walkSpeed;
+    // Smooth blend between walking and idle (0 = idle, 1 = walking)
+    const targetBlend = this.isWalking ? 1 : 0;
+    if (this._walkBlend === undefined) this._walkBlend = 0;
+    this._walkBlend += (targetBlend - this._walkBlend) * Math.min(1, dt * 8);
 
-      // Legs — thigh and calf swing together
-      this.leftLeg.rotation.x = Math.sin(t) * 0.4;
-      this.rightLeg.rotation.x = Math.sin(t + Math.PI) * 0.4;
-      if (this.leftCalf) this.leftCalf.rotation.x = Math.sin(t) * 0.25;
-      if (this.rightCalf) this.rightCalf.rotation.x = Math.sin(t + Math.PI) * 0.25;
+    const wb = this._walkBlend;
+    const walkSpeed = 5.5;
+    const t = this.animTime * walkSpeed;
 
-      // Arms — upper and forearm swing opposite to legs
-      if (this.leftUpperArm) this.leftUpperArm.rotation.x = Math.sin(t + Math.PI) * 0.2;
-      if (this.rightUpperArm) this.rightUpperArm.rotation.x = Math.sin(t) * 0.2;
-      this.leftArm.rotation.x = Math.sin(t + Math.PI) * 0.3;
-      this.rightArm.rotation.x = Math.sin(t) * 0.3;
+    // Walk cycle values (smoothed by blend)
+    const legSwing = Math.sin(t) * 0.35 * wb;
+    const legSwingR = Math.sin(t + Math.PI) * 0.35 * wb;
+    const calfSwing = Math.sin(t + 0.3) * 0.2 * wb; // slight phase offset for natural bend
+    const calfSwingR = Math.sin(t + Math.PI + 0.3) * 0.2 * wb;
+    const armSwing = Math.sin(t + Math.PI) * 0.25 * wb;
+    const armSwingR = Math.sin(t) * 0.25 * wb;
+    const upperArmSwing = Math.sin(t + Math.PI) * 0.15 * wb;
+    const upperArmSwingR = Math.sin(t) * 0.15 * wb;
 
-      // Torso bob
-      const bob = Math.abs(Math.sin(t * 2)) * 0.04;
-      this.torso.position.y = 1.55 + bob;
-      this.head.position.y = 2.28 + bob;
+    // Bob — double-frequency for natural two-step bounce
+    const bob = Math.abs(Math.sin(t)) * 0.035 * wb;
 
-      // Slight torso twist
-      this.torso.rotation.y = Math.sin(t) * 0.04;
-    } else {
-      // Idle breathing
-      const breath = Math.sin(this.animTime * 1.5) * 0.015;
-      this.torso.position.y = 1.55 + breath;
-      this.head.position.y = 2.28 + breath;
-      this.torso.rotation.y = 0;
+    // Idle breathing
+    const breath = Math.sin(this.animTime * 1.5) * 0.015 * (1 - wb);
 
-      // Reset limbs
-      this.leftArm.rotation.x = 0;
-      this.rightArm.rotation.x = 0;
-      this.leftLeg.rotation.x = 0;
-      this.rightLeg.rotation.x = 0;
-      if (this.leftUpperArm) this.leftUpperArm.rotation.x = 0;
-      if (this.rightUpperArm) this.rightUpperArm.rotation.x = 0;
-      if (this.leftCalf) this.leftCalf.rotation.x = 0;
-      if (this.rightCalf) this.rightCalf.rotation.x = 0;
-    }
+    // Idle weight shift (subtle sway)
+    const idleSway = Math.sin(this.animTime * 0.7) * 0.01 * (1 - wb);
 
-    // Cape physics — wind + movement
+    // Apply
+    this.leftLeg.rotation.x = legSwing;
+    this.rightLeg.rotation.x = legSwingR;
+    if (this.leftCalf) this.leftCalf.rotation.x = calfSwing;
+    if (this.rightCalf) this.rightCalf.rotation.x = calfSwingR;
+
+    if (this.leftUpperArm) this.leftUpperArm.rotation.x = upperArmSwing;
+    if (this.rightUpperArm) this.rightUpperArm.rotation.x = upperArmSwingR;
+    this.leftArm.rotation.x = armSwing;
+    this.rightArm.rotation.x = armSwingR;
+
+    this.torso.position.y = 1.55 + bob + breath;
+    this.head.position.y = 2.28 + bob + breath;
+
+    // Torso twist while walking, idle sway while standing
+    this.torso.rotation.y = Math.sin(t) * 0.04 * wb + idleSway;
+
+    // Subtle head look — slight tilt toward movement
+    this.head.rotation.z = Math.sin(t * 0.5) * 0.02 * wb;
+    this.head.rotation.x = -0.05 * wb; // slight forward lean when moving
+
+    // Cape physics — wind + movement-reactive
     if (this.cape) {
       const capeGeo = this.cape.geometry;
       const pos = capeGeo.attributes.position;
+      const windStrength = 0.08 + wb * 0.06;
       for (let i = 0; i < pos.count; i++) {
         const y = pos.getY(i);
         const distFromTop = 1.3 - y;
-        const wave = Math.sin(time * 2 + distFromTop * 3) * 0.1;
-        const flutter = Math.sin(time * 5 + distFromTop * 5 + i * 0.3) * 0.02;
-        pos.setZ(i, -0.32 + (wave + flutter) * Math.max(distFromTop, 0));
+        const d = Math.max(distFromTop, 0);
+        const wave = Math.sin(time * 2.5 + distFromTop * 2.5) * windStrength;
+        const flutter = Math.sin(time * 6 + distFromTop * 4 + i * 0.4) * 0.015;
+        const moveDrag = wb * d * 0.04; // cape pulls back more when moving
+        pos.setZ(i, -0.32 + (wave + flutter + moveDrag) * d);
       }
       pos.needsUpdate = true;
     }
