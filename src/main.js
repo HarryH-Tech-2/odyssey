@@ -4,6 +4,7 @@ import { InputManager } from './engine/InputManager.js';
 import { MenuScene } from './scenes/MenuScene.js';
 import { TroyDepartureScene } from './scenes/TroyDepartureScene.js';
 import { SailingScene } from './scenes/SailingScene.js';
+import { IslandExplorationScene } from './scenes/IslandExplorationScene.js';
 
 const canvas = document.getElementById('game-canvas');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -20,6 +21,7 @@ const sceneManager = new SceneManager(renderer, input);
 sceneManager.register('menu', MenuScene);
 sceneManager.register('troyDeparture', TroyDepartureScene);
 sceneManager.register('sailing', SailingScene);
+sceneManager.register('islandExploration', IslandExplorationScene);
 sceneManager.switchTo('menu');
 
 const clock = new THREE.Clock();

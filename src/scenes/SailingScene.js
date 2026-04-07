@@ -189,6 +189,13 @@ export class SailingScene extends GameScene {
     this.cameraAngle = 0;
 
     this.input.enablePointerLock();
+
+    // Restore ship position if returning from island exploration
+    if (data && data.shipPosition) {
+      this.ship.group.position.copy(data.shipPosition);
+      this.ship.heading = data.shipHeading || 0;
+      this.ship.group.rotation.y = this.ship.heading;
+    }
   }
 
   async exit() {
