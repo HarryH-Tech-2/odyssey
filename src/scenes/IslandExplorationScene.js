@@ -53,7 +53,9 @@ export class IslandExplorationScene extends GameScene {
     this.sky.addTo(this.scene);
 
     // ── Add the island to this scene ──
+    // Clone and reset to origin — exploration scene is centered on the island
     this.islandGroup = this.island.group.clone();
+    this.islandGroup.position.set(0, 0, 0);
     this.scene.add(this.islandGroup);
 
     // ── Static ship at shore ──
